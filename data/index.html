@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Wärmepumpe Pool</title>
+    <script src="script.js"></script>
+    <!-- <link rel="stylesheet" href="style.css" /> -->
+</head>
+<body>    
+    <h1>Config Wärmepumpe Pool</h1>
+    <form>
+        <div>
+            <h2>Config MQTT</h2>
+        </div>
+        <div>
+            MQTT Broker:<br>
+            <input type="text" name="mqttBroker" value="sruetzler.de" id="mqttBroker">
+            <br>
+            <input type="checkbox" name="mqttBrokerC" value="change" id="changeMqttBroker">
+            <label for="mqttBrokerC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            MQTT Port:<br>
+            <input type="text" name="mqttPort" value="1883" id="mqttPort">
+            <br>
+            <input type="checkbox" name="mqttPortC" value="change" id="changeMqttPort">
+            <label for="mqttPortC">Change Inputs</label>
+        </div>
+        <br>
+
+        <div>
+            Benutzername MQTT Broker:<br>
+            <input type="text" name="mqttBenutzername" id="mqttBenutzername">
+            <br>
+            <input type="checkbox" name="mqttBenutzernameC" value="change"id="changeBenutzername">
+            <label for="mqttBenutzernameC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            Passwort MQTT Broker:<br>
+            <input type="password" name="mqttPasswort" id="mqttPasswort">
+            <br>
+            <input type="checkbox" name="mqttPasswortC" value="change" id="changePasswort">
+            <label for="mqttPasswortC">Change Inputs</label>
+        </div>
+            <br>
+        <div>
+            MQTT Topic:<br>
+            <input type="text" name="mqttTopic" id="mqttTopic" value="pool/waermepumpe">
+            <br>
+            <input type="checkbox" name="mqttTopicC" value="change" id="changeMqttTopic">
+            <label for="mqttTopicC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            <h2>Config WLAN</h2>
+        </div>
+        <div>
+            SSID WLAN:<br>
+            <input type="text" name="ssid" id="ssid">
+            <br>
+            <input type="checkbox" name="ssidC" value="change" id="changeSsid">
+            <label for="ssidC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            Passwort WLAN:<br>
+            <input type="password" name="passwort" id="passwortWlan">
+            <br>
+            <input type="checkbox" name="passwortC" value="change" id="changePasswortWlan">
+            <label for="passwortC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            <button type="button" onclick="datenSenden()">Save</button>
+        </div>
+
+    </form><br>
+
+       
+</body>
+<footer style="margin-top: 20px;">
+    <iframe name="hidden-form" style="display: none;"></iframe>
+    <p>© 2024 by Henri Rützler</p>
+
+</footer> 
+</html>
