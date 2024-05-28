@@ -20,21 +20,42 @@ void ConfigWebserver::SERVER(){
     pServer->on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(LittleFS, "/favicon.ico", "text/plain");
     });
-
+    
     pServer->onRequestBody([this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total){
         if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
-        Serial.println("Daten empfangen");
-        Serial.println(request->url());
-
-
+        
         if(request->url()=="/neueDaten" && request->method() == HTTP_POST){
-            // Serial.println("Daten empfangen");
-            // Serial.println((char*)data);
-            deserializeJson(neueDaten, (char*)data);
-            // Serial.println(neueDaten.as<String>());
-            neueDatenVerarbeiten(neueDaten);
-            request->send(200, "text/plain", "Daten empfangen");
+    
+            buffer += String((char*)data);
+
+            if(index + len == total) {
+                Serial.println("Daten empfangen");
+                Serial.println(request->url());
+                Serial.print("Länge: ");
+                Serial.println(len);
+
+                // Serial.println(buffer);
+
+                deserializeJson(neueDaten, buffer);
+                Serial.println(neueDaten.as<String>());
+                neueDatenVerarbeiten(neueDaten);
+                request->send(200, "text/plain", "Daten empfangen");
+
+                // Clear the buffer
+                buffer = "";
+                }
+        
         }
+
+
+            // if(request->url()=="/neueDaten" && request->method() == HTTP_POST){
+            //     // Serial.println("Daten empfangen");
+            //     // Serial.println((char*)data);
+            //     deserializeJson(neueDaten, (char*)data);
+            //     // Serial.println(neueDaten.as<String>());
+            //     neueDatenVerarbeiten(neueDaten);
+            //     request->send(200, "text/plain", "Daten empfangen");
+            // }
     });
 
     pServer->onNotFound([this](AsyncWebServerRequest *request) {
@@ -54,29 +75,31 @@ void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
     if(daten["changeMqttBroker"]){
         config["mqttBroker"] = daten["mqttBroker"];
     }
-
     if(daten["changeMqttPort"]){
         config["mqttPort"] = daten["mqttPort"];
     }
-
     if(daten["changeMqttBenutzername"]){
         config["mqttBenutzername"] = daten["mqttBenutzername"];
     }
-
     if(daten["changeMqttPasswort"]){
         config["mqttPasswort"] = daten["mqttPasswort"];
     }
-
-    if(daten["changeMqttTopic"]){
-        config["mqttTopic"] = daten["mqttTopic"];
+    if(daten["changeMqttTopicPumpe"]){
+        config["mqttTopicPumpe"] = daten["mqttTopicPumpe"];
     }
-
+    if(daten["changeMqttTopicSteuerung"]){
+        config["mqttTopicSteuerung"] = daten["mqttTopicSteuerung"];
+    }
+    if(daten["changeMqttTopicZustand"]){
+        config["mqttTopicZustand"] = daten["mqttTopicZustand"];
+    }
     if(daten["changeSsid"]){
         config["ssid"] = daten["ssid"];
     }
     if(daten["changePasswortWlan"]){
         config["passwortWlan"] = daten["passwortWlan"];
     }
+
 
     saveConfig();
     
@@ -108,7 +131,9 @@ void ConfigWebserver::loadConfig(){
         config["mqttPort"] = 8883;
         config["mqttBenutzername"] = "";
         config["mqttPasswort"] = "";
-        config["mqttTopic"] = "pool/waermepumpe";
+        config["mqttTopicPumpe"] = "henri/pool/pumpe/";
+        config["mqttTopicSteuerung"] = "henri/pool/waermepumpe/steuerung";
+        config["mqttTopicZustand"] = "henri/pool/waermepumpe/zustand";
         config["ssid"] = "";
         config["passwortWlan"] = "";
         saveConfig();
@@ -127,5 +152,5 @@ void ConfigWebserver::saveConfig(){
 
     serializeJson(config, configFile);
     configFile.close();
-    Serial.println(config.as<String>());
+    // Serial.println(config.as<String>());
 }

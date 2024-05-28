@@ -36,6 +36,7 @@ class ConfigWebserver {
         fs::FS* dateisystem;
         String username;
         String password; 
+        String buffer = "";
         void SERVER();
         void neueDatenVerarbeiten(JsonDocument neueDaten);
         void loadConfig();

@@ -23,7 +23,7 @@
         <br>
         <div>
             MQTT Port:<br>
-            <input type="text" name="mqttPort" value="1883" id="mqttPort">
+            <input type="text" name="mqttPort" value="8883" id="mqttPort">
             <br>
             <input type="checkbox" name="mqttPortC" value="change" id="changeMqttPort">
             <label for="mqttPortC">Change Inputs</label>
@@ -47,11 +47,27 @@
         </div>
             <br>
         <div>
-            MQTT Topic:<br>
-            <input type="text" name="mqttTopic" id="mqttTopic" value="pool/waermepumpe">
+            MQTT Topic für Heartbeat:<br>
+            <input type="text" name="mqttTopic" id="mqttHeartBeat" value="henri/pool/pumpe/">
             <br>
-            <input type="checkbox" name="mqttTopicC" value="change" id="changeMqttTopic">
+            <input type="checkbox" name="mqttTopicC" value="change" id="changeMqttHearbeat">
             <label for="mqttTopicC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            MQTT Tobic für Befehle:<br>
+            <input type="text" name="mqttBefehl" id="mqttSteuerung" value="henri/pool/waermepumpe/steuerung">
+            <br>
+            <input type="checkbox" name="mqttBefehlC" value="change" id="changeMqttSteuerung">
+            <label for="mqttBefehlC">Change Inputs</label>
+        </div>
+        <br>
+        <div>
+            MQTT Topic für Zustand:<br>
+            <input type="text" name="mqttZustand" id="mqttZustand" value="henri/pool/waermepumpe/zustand">
+            <br>
+            <input type="checkbox" name="mqttZustandC" value="change" id="changeMqttZustand">
+            <label for="mqttZustandC">Change Inputs</label>
         </div>
         <br>
         <div>
