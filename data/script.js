@@ -1,50 +1,51 @@
+var mqttBroker;
+var changeMqttBroker;
+var mqttPort;
+var changeMqttPort;
+var mqttBenutzername;
+var changeMqttBenutzername;
+var mqttPasswort;
+var changeMqttPasswort;
+
+//Mqtt Topics
+var mqttTopicPumpe;
+var changeMqttTopicPumpe;
+var mqttTopicSteuerung;
+var changeMqttTopicSteuerung;
+var mqttTopicZustand;
+var changeMqttTopicZustand;
+
+//Wlan Daten
+var ssid;
+var changeSsid;
+var passwortWlan;
+var changePasswortWlan;
+
+
+
 function datenSenden(){
 
     //Mqtt Daten
-    var mqttBroker = document.getElementById("mqttBroker").value;
-    var changeMqttBroker = document.getElementById("changeMqttBroker").checked;
-    var mqttPort = document.getElementById("mqttPort").value;
-    var changeMqttPort = document.getElementById("changeMqttPort").checked;
-    var mqttBenutzername = document.getElementById("mqttBenutzername").value;
-    var changeMqttBenutzername = document.getElementById("changeBenutzername").checked;
-    var mqttPasswort = document.getElementById("mqttPasswort").value;
-    var changeMqttPasswort = document.getElementById("changePasswort").checked;
-
-    //Mqtt Topics
-    var mqttTopicPumpe = document.getElementById("mqttHeartBeat").value;
-    var changeMqttTopicPumpe = document.getElementById("changeMqttHearbeat").checked;
-    var mqttTopicSteuerung = document.getElementById("mqttSteuerung").value;
-    var changeMqttTopicSteuerung = document.getElementById("changeMqttSteuerung").checked;
-    var mqttTopicZustand = document.getElementById("mqttZustand").value;
-    var changeMqttTopicZustand = document.getElementById("changeMqttZustand").checked;
-    
-    //Wlan Daten
-    var ssid = document.getElementById("ssid").value;
-    var changeSsid = document.getElementById("changeSsid").checked;
-    var passwortWlan = document.getElementById("passwortWlan").value;
-    var changePasswortWlan = document.getElementById("changePasswortWlan").checked;
-
-
 
     var data = {
-        "mqttBroker": mqttBroker,
-        "changeMqttBroker": changeMqttBroker,
-        "mqttPort": mqttPort,
-        "changeMqttPort": changeMqttPort,
-        "mqttBenutzername": mqttBenutzername,
-        "changeMqttBenutzername": changeMqttBenutzername,
-        "mqttPasswort": mqttPasswort,
-        "changeMqttPasswort": changeMqttPasswort,
-        "mqttTopicPumpe": mqttTopicPumpe,
-        "changeMqttTopicPumpe": changeMqttTopicPumpe,
-        "mqttTopicSteuerung": mqttTopicSteuerung,
-        "changeMqttTopicSteuerung": changeMqttTopicSteuerung,
-        "mqttTopicZustand": mqttTopicZustand,
-        "changeMqttTopicZustand": changeMqttTopicZustand,
-        "ssid": ssid,
-        "changeSsid": changeSsid,
-        "passwortWlan": passwortWlan,
-        "changePasswortWlan": changePasswortWlan
+        "mqttBroker": mqttBroker.value,
+        "changeMqttBroker": changeMqttBroker.checked,
+        "mqttPort": mqttPort.value,
+        "changeMqttPort": changeMqttPort.checked,
+        "mqttBenutzername": mqttBenutzername.value,
+        "changeMqttBenutzername": changeMqttBenutzername.checked,
+        "mqttPasswort": mqttPasswort.value,
+        "changeMqttPasswort": changeMqttPasswort.checked,
+        "mqttTopicPumpe": mqttTopicPumpe.value,
+        "changeMqttTopicPumpe": changeMqttTopicPumpe.checked,
+        "mqttTopicSteuerung": mqttTopicSteuerung.value,
+        "changeMqttTopicSteuerung": changeMqttTopicSteuerung.checked,
+        "mqttTopicZustand": mqttTopicZustand.value,
+        "changeMqttTopicZustand": changeMqttTopicZustand.checked,
+        "ssid": ssid.value,
+        "changeSsid": changeSsid.checked,
+        "passwortWlan": passwortWlan.value,
+        "changePasswortWlan": changePasswortWlan.checked
     };
 
     var xhr = new XMLHttpRequest();
@@ -56,5 +57,51 @@ function datenSenden(){
             console.log(xhr.responseText);
         }
     }
-
+    
 }
+
+function datenLaden(){
+
+    mqttBroker = document.getElementById("mqttBroker");
+    changeMqttBroker = document.getElementById("changeMqttBroker");
+    mqttPort = document.getElementById("mqttPort");
+    changeMqttPort = document.getElementById("changeMqttPort");
+    mqttBenutzername = document.getElementById("mqttBenutzername");
+    changeMqttBenutzername = document.getElementById("changeBenutzername");
+    mqttPasswort = document.getElementById("mqttPasswort");
+    changeMqttPasswort = document.getElementById("changePasswort");
+
+    //Mqtt Topics
+    mqttTopicPumpe = document.getElementById("mqttHeartBeat");
+    changeMqttTopicPumpe = document.getElementById("changeMqttHearbeat");
+    mqttTopicSteuerung = document.getElementById("mqttSteuerung");
+    changeMqttTopicSteuerung = document.getElementById("changeMqttSteuerung");
+    mqttTopicZustand = document.getElementById("mqttZustand");
+    changeMqttTopicZustand = document.getElementById("changeMqttZustand");
+
+    //Wlan Daten
+    ssid = document.getElementById("ssid");
+    changeSsid = document.getElementById("changeSsid");
+    passwortWlan = document.getElementById("passwortWlan");
+    changePasswortWlan = document.getElementById("changePasswortWlan");
+
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/daten", true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+            var response = JSON.parse(xhr.responseText);
+            mqttBroker.setAttribute("value", response["mqttBroker"]);
+            mqttPort.setAttribute("value", response["mqttPort"]);
+            mqttTopicPumpe.setAttribute("value", response["mqttTopicPumpe"]);
+            mqttTopicSteuerung.setAttribute("value", response["mqttTopicSteuerung"]);
+            mqttTopicZustand.setAttribute("value", response["mqttTopicZustand"]);
+            
+            // Hier kannst du die erhaltenen Daten weiterverarbeiten
+            console.log(response);
+        }
+    }
+    xhr.send();
+}
+
+window.addEventListener('load', datenLaden);

@@ -12,11 +12,9 @@ class ConfigWebserver {
         ConfigWebserver(fs::FS* fs, String websitePasswort, String websiteUsername) : dateisystem(fs){
             this->username = websiteUsername;
             this->password = websitePasswort;
-            Serial.println(username);
-            Serial.println(password);
             pServer = new AsyncWebServer(80);
-            SERVER();
             loadConfig();
+            SERVER();
 
 
         };

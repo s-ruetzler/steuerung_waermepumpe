@@ -21,6 +21,24 @@ void ConfigWebserver::SERVER(){
         request->send(LittleFS, "/favicon.ico", "text/plain");
     });
     
+    pServer->on("/daten", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
+        // loadConfig();
+        JsonDocument datenSenden;
+        datenSenden["mqttBroker"] = config["mqttBroker"];
+        datenSenden["mqttPort"] = config["mqttPort"];
+        datenSenden["mqttTopicPumpe"] = config["mqttTopicPumpe"];
+        datenSenden["mqttTopicSteuerung"] = config["mqttTopicSteuerung"];
+        datenSenden["mqttTopicZustand"] = config["mqttTopicZustand"];
+
+
+        String json = "";
+        serializeJson(datenSenden, json);
+        request->send(200, "application/json", json);
+
+        
+    });
+
     pServer->onRequestBody([this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total){
         if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
         
@@ -37,7 +55,7 @@ void ConfigWebserver::SERVER(){
                 // Serial.println(buffer);
 
                 deserializeJson(neueDaten, buffer);
-                Serial.println(neueDaten.as<String>());
+                // Serial.println(neueDaten.as<String>());
                 neueDatenVerarbeiten(neueDaten);
                 request->send(200, "text/plain", "Daten empfangen");
 
@@ -68,9 +86,7 @@ void ConfigWebserver::SERVER(){
 
 
 void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
-    Serial.println(daten.as<String>());
-
-    loadConfig();
+    // Serial.println(daten.as<String>());
 
     if(daten["changeMqttBroker"]){
         config["mqttBroker"] = daten["mqttBroker"];
@@ -110,6 +126,17 @@ void ConfigWebserver::loadConfig(){
     File configFile = dateisystem->open("/json/config.json", "r");
     if (!configFile){
         Serial.println("Failed to open config file for reading");
+        config["mqttBroker"] = "sruetzler.de";
+        config["mqttPort"] = 8883;
+        config["mqttBenutzername"] = "";
+        config["mqttPasswort"] = "";
+        config["mqttTopicPumpe"] = "tele/tasmota_3094E0/SENSOR";
+        config["mqttTopicSteuerung"] = "waermepumpe/steuerung";
+        config["mqttTopicZustand"] = "waermepumpe/zustand";
+        config["ssid"] = "";
+        config["passwortWlan"] = "";
+        saveConfig();
+
         return;
     }
 
@@ -127,20 +154,11 @@ void ConfigWebserver::loadConfig(){
     // DeserializationError error = deserializeJson(config, configFile);
     if (error){
         Serial.println("Failed to parse config file");
-        config["mqttBroker"] = "sruetzler.de";
-        config["mqttPort"] = 8883;
-        config["mqttBenutzername"] = "";
-        config["mqttPasswort"] = "";
-        config["mqttTopicPumpe"] = "henri/pool/pumpe/";
-        config["mqttTopicSteuerung"] = "henri/pool/waermepumpe/steuerung";
-        config["mqttTopicZustand"] = "henri/pool/waermepumpe/zustand";
-        config["ssid"] = "";
-        config["passwortWlan"] = "";
-        saveConfig();
+       
 
         return;
     }
-    Serial.println(config.as<String>());
+    // Serial.println(config.as<String>());
 }
 
 void ConfigWebserver::saveConfig(){

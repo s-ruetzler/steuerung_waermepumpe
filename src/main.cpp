@@ -22,7 +22,6 @@ bool configMode = false;
 bool wlanOpen = false;
 bool wlanConnected = false;
 int zustand = 0;
-const int pinEinschalten = A0;
 
 
 String ssidWLanSelf;
@@ -44,11 +43,10 @@ void passwordsIntern();
 void changeZustand(int newNR);
 void callback_mqtt(char* topic, byte* payload, unsigned int length);
 void reconnect_mqtt();
+void handlePayloadPumpe(String payload);
 
 void setup() {
   Serial.begin(115200);
-  pinMode(pinEinschalten, OUTPUT);
-  digitalWrite(pinEinschalten, LOW);
   delay(2000);
 
   if(!LittleFS.begin()){
@@ -59,11 +57,11 @@ void setup() {
 
   configServer = new ConfigWebserver(&LittleFS, usernameWebsite, passwordWebsite);
 
-  openWLAN();
   setup_wifi_mqtt();
+  // openWLAN();
 
 
-  
+
 
 }
 
@@ -81,7 +79,7 @@ void loop() {
   }
 
   //Wenn inerhalb von 10 Sekunden keine WLAN verbindung hergestellt werden kann, dann wird der ConfigMode gestartet.
-  if ((!wlanConnected) && millis() > 10000){
+  if ((!wlanConnected) && millis() > 20000){
     configMode = true;
   }
 
@@ -99,7 +97,7 @@ void loop() {
 
 
 void openWLAN(){
-  WiFi.mode(WIFI_AP_STA);
+  WiFi.mode(WIFI_AP);
   
   WiFi.softAP(ssidWLanSelf, passwordWlanSelf);
 
@@ -137,7 +135,9 @@ void setup_wifi_mqtt(){
   mqttTopicSteuerung = tmpTS;
   mqttTopicZustand = tmpTZ;
 
+  WiFi.mode(WIFI_STA);
   WiFi.begin(wlanSsid, wlanPasswort);
+  delay(2000);
 
 }
 
@@ -162,23 +162,23 @@ void changeZustand(int newNR){
   switch (zustand)
   {
   case 0:
-    digitalWrite(pinEinschalten, LOW);
+    // digitalWrite(pinEinschalten, LOW);
     break;
   
   case 1:
-    digitalWrite(pinEinschalten, HIGH);
+    // digitalWrite(pinEinschalten, HIGH);
     break;
 
   case 2:
-    digitalWrite(pinEinschalten, HIGH);
+    // digitalWrite(pinEinschalten, HIGH);
     break;
 
   case 3:
-    digitalWrite(pinEinschalten, LOW);
+    // digitalWrite(pinEinschalten, LOW);
     break;
   
   default:
-    digitalWrite(pinEinschalten, LOW);
+    // digitalWrite(pinEinschalten, LOW);
     break;
   }
   
@@ -195,6 +195,18 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
     payloadString += (char)payload[i];
   }
   Serial.println(payloadString);
+
+  String topicString = String(topic);
+  if (topicString == mqttTopicPumpe) {
+    // Pass the payload to a function for further processing
+    handlePayloadPumpe(payloadString);
+  } else if (topicString == mqttTopicSteuerung) {
+    // Handle data for mqttTopicSteuerung
+    // ...
+  } else {
+    Serial.print("Unknown topic: ");
+    Serial.println(topicString);
+  }
 
   // DeserializationError error = deserializeJson(daten, payload);
   // if (error) {
@@ -233,4 +245,15 @@ void reconnect_mqtt() {
     Serial.print(client.state());
     Serial.println(" try again in 5 seconds");
   }
+}
+
+void handlePayloadPumpe(String payload) {
+  if (payload.toInt() < 10){
+    
+    if (zustand == 1){
+      changeZustand(0);
+    }
+    
+  }
+
 }
