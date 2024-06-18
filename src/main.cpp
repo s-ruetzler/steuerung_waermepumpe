@@ -26,6 +26,13 @@ int zustand = 0;
 bool setupOTAaufgerufen = false;
 JsonDocument datenPumpe;
 
+const int OUTPUT_PIN = D1;
+const int INPUT_PIN = D2;
+int zustandKompressorPin = LOW;
+int zustandKompressorPinAlt = LOW;
+int steuerungZustand = 0;
+const int prellzeit = 50;
+unsigned int lastMillisPrell = 0;
 
 String ssidWLanSelf;
 String passwordWlanSelf;
@@ -52,6 +59,8 @@ void setupOTA();
 
 void setup() {
   Serial.begin(115200);
+  pinMode(OUTPUT_PIN, OUTPUT);
+  pinMode(INPUT_PIN, INPUT);
   delay(2000);
 
   if(!LittleFS.begin()){
@@ -72,6 +81,9 @@ void setup() {
 
 void loop() {
   wlanConnected = WiFi.status() == WL_CONNECTED;
+  zustandKompressorPin = digitalRead(INPUT_PIN);
+
+
   if (configMode){
     if (!wlanOpen){
       openWLAN();
@@ -106,11 +118,33 @@ void loop() {
   //Wenn die Pumpe länger als 20 Sekunden nichts sendet, dann wird der Zustand auf 0 gesetzt.
   if (millis() - lastTimePumpe > 20000)
   {
+    steuerungZustand = 0;
     if (zustand != 0)
     {
       changeZustand(0);
     }
   }
+
+  if (zustandKompressorPin != zustandKompressorPinAlt){
+    zustandKompressorPinAlt = zustandKompressorPin;
+    lastMillisPrell = millis();
+  }
+
+  if (zustand == 2 && zustandKompressorPin == HIGH && millis() - lastMillisPrell > prellzeit)
+  {
+    changeZustand(1);
+  }
+
+  if (zustand == 1 && zustandKompressorPin == LOW && millis() - lastMillisPrell > prellzeit)
+  {
+    changeZustand(2);
+  }
+
+  if (steuerungZustand == 1 && zustand == 0)
+  {
+    changeZustand(3);
+  }
+  
 
   client.loop();
   ArduinoOTA.handle();
@@ -183,23 +217,23 @@ void changeZustand(int newNR){
   switch (zustand)
   {
   case 0:
-    // digitalWrite(pinEinschalten, LOW);
+    digitalWrite(OUTPUT_PIN, LOW);
     break;
   
   case 1:
-    // digitalWrite(pinEinschalten, HIGH);
+    digitalWrite(OUTPUT_PIN, HIGH);
     break;
 
   case 2:
-    // digitalWrite(pinEinschalten, HIGH);
+    digitalWrite(OUTPUT_PIN, HIGH);
     break;
 
   case 3:
-    // digitalWrite(pinEinschalten, LOW);
+    digitalWrite(OUTPUT_PIN, LOW);
     break;
   
   default:
-    // digitalWrite(pinEinschalten, LOW);
+    digitalWrite(OUTPUT_PIN, LOW);
     break;
   }
   client.publish(mqttTopicZustand.c_str(), String(zustand).c_str(), true);
@@ -210,7 +244,7 @@ void changeZustand(int newNR){
 void callback_mqtt(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
-  Serial.print("] ");
+  Serial.println("] ");
 
   // String payloadString = "";
   // for (unsigned int i = 0; i < length; i++) {
@@ -228,16 +262,6 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
     Serial.print("Unknown topic: ");
     Serial.println(topicString);
   }
-
-  // DeserializationError error = deserializeJson(daten, payload);
-  // if (error) {
-  //   Serial.print(F("Parsing failed: "));
-  //   Serial.println(error.c_str());
-  //   return;
-  // }
-  // veraenderung();
-
-  // Serial.println(daten.as<String>());
 
 }
 
@@ -283,18 +307,20 @@ void handlePayloadPumpe(byte* payload, unsigned int length){
   int value = datenPumpe["ENERGY"]["Power"];
 
 
-  // Print JSON values
-  Serial.print("Value: ");
-  Serial.println(value);
+  // // Print JSON values
+  // Serial.print("Value: ");
+  // Serial.println(value);
 
-  if (value <= 10)
+  if (value <= 10 && zustand == 1)
   {
     changeZustand(0);
+  } else if (zustand == 3 && steuerungZustand == 1 && value > 10){
+    changeZustand(2);
   }
   
 
-  Serial.println();
-  Serial.println(datenPumpe.as<String>());
+  // Serial.println();
+  // Serial.println(datenPumpe.as<String>());
 }
 
 void handlePayloadSteuerung(byte* payload, unsigned int length){
@@ -307,13 +333,15 @@ void handlePayloadSteuerung(byte* payload, unsigned int length){
   
   if (payloadString == "1")
   {
-    changeZustand(3);
+    changeZustand(2);
+    steuerungZustand = 1;
 
   } else{
     changeZustand(0);
+    steuerungZustand = 0;
   }
   
-  Serial.println(payloadString);
+  // Serial.println(payloadString);
 
 }
 
