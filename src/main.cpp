@@ -5,7 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncTCP.h>
 #include <configWebserver.h>
-
+#include <ArduinoOTA.h>
 #include <PubSubClient.h>
 
 String mqtt_user;
@@ -17,11 +17,14 @@ String mqttTopicSteuerung;
 String mqttTopicZustand;
 
 unsigned long lastTime = 0;
+unsigned long lastTimePumpe = 0;
 unsigned int timerDelay = 3000;
 bool configMode = false;
 bool wlanOpen = false;
 bool wlanConnected = false;
 int zustand = 0;
+bool setupOTAaufgerufen = false;
+JsonDocument datenPumpe;
 
 
 String ssidWLanSelf;
@@ -43,7 +46,9 @@ void passwordsIntern();
 void changeZustand(int newNR);
 void callback_mqtt(char* topic, byte* payload, unsigned int length);
 void reconnect_mqtt();
-void handlePayloadPumpe(String payload);
+void handlePayloadPumpe(byte* payload, unsigned int length);
+void handlePayloadSteuerung(byte* payload, unsigned int length);
+void setupOTA();
 
 void setup() {
   Serial.begin(115200);
@@ -78,6 +83,11 @@ void loop() {
     }
   }
 
+  if (!setupOTAaufgerufen && wlanConnected){
+    setupOTA();
+    setupOTAaufgerufen = true;
+  }
+
   //Wenn inerhalb von 10 Sekunden keine WLAN verbindung hergestellt werden kann, dann wird der ConfigMode gestartet.
   if ((!wlanConnected) && millis() > 20000){
     configMode = true;
@@ -92,7 +102,18 @@ void loop() {
       lastTime = millis();
     }
   }
+
+  //Wenn die Pumpe länger als 20 Sekunden nichts sendet, dann wird der Zustand auf 0 gesetzt.
+  if (millis() - lastTimePumpe > 20000)
+  {
+    if (zustand != 0)
+    {
+      changeZustand(0);
+    }
+  }
+
   client.loop();
+  ArduinoOTA.handle();
 }
 
 
@@ -181,6 +202,7 @@ void changeZustand(int newNR){
     // digitalWrite(pinEinschalten, LOW);
     break;
   }
+  client.publish(mqttTopicZustand.c_str(), String(zustand).c_str(), true);
   
 }
 
@@ -190,19 +212,18 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
   Serial.print(topic);
   Serial.print("] ");
 
-  String payloadString = "";
-  for (unsigned int i = 0; i < length; i++) {
-    payloadString += (char)payload[i];
-  }
-  Serial.println(payloadString);
+  // String payloadString = "";
+  // for (unsigned int i = 0; i < length; i++) {
+  //   payloadString += (char)payload[i];
+  // }
+  // Serial.println(payloadString);
 
   String topicString = String(topic);
   if (topicString == mqttTopicPumpe) {
     // Pass the payload to a function for further processing
-    handlePayloadPumpe(payloadString);
+    handlePayloadPumpe(payload, length);
   } else if (topicString == mqttTopicSteuerung) {
-    // Handle data for mqttTopicSteuerung
-    // ...
+    handlePayloadSteuerung(payload, length);
   } else {
     Serial.print("Unknown topic: ");
     Serial.println(topicString);
@@ -224,7 +245,7 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
 void reconnect_mqtt() {
 
   client.setServer(mqtt_server.c_str(), mqtt_port);
-  // client.setBufferSize(2048);
+  client.setBufferSize(2048);
   client.setCallback(callback_mqtt);
 
   // Loop until we're reconnected
@@ -235,7 +256,7 @@ void reconnect_mqtt() {
   if (client.connect(clientId.c_str(), mqtt_user.c_str(), mqtt_pass.c_str())) {
     Serial.println("Connectet");
     // Once connected, publish an announcement...
-    client.publish(mqttTopicZustand.c_str(), String(zustand).c_str());
+    client.publish(mqttTopicZustand.c_str(), String(zustand).c_str(), true);
     // ... and resubscribe
     client.subscribe(mqttTopicPumpe.c_str());
     client.subscribe(mqttTopicSteuerung.c_str());
@@ -247,13 +268,96 @@ void reconnect_mqtt() {
   }
 }
 
-void handlePayloadPumpe(String payload) {
-  if (payload.toInt() < 10){
-    
-    if (zustand == 1){
-      changeZustand(0);
-    }
-    
+void handlePayloadPumpe(byte* payload, unsigned int length){
+  // StaticJsonDocument<400> doc;
+  DeserializationError error = deserializeJson(datenPumpe, payload, length);
+  if (error) {
+    Serial.print("Failed to parse JSON payload: ");
+    Serial.println(error.c_str());
+    changeZustand(0);
+    return;
   }
+  lastTimePumpe = millis();
+
+  // Access JSON values
+  int value = datenPumpe["ENERGY"]["Power"];
+
+
+  // Print JSON values
+  Serial.print("Value: ");
+  Serial.println(value);
+
+  if (value <= 10)
+  {
+    changeZustand(0);
+  }
+  
+
+  Serial.println();
+  Serial.println(datenPumpe.as<String>());
+}
+
+void handlePayloadSteuerung(byte* payload, unsigned int length){
+
+
+  String payloadString = "";
+  for (unsigned int i = 0; i < length; i++) {
+    payloadString += (char)payload[i];
+  }
+  
+  if (payloadString == "1")
+  {
+    changeZustand(3);
+
+  } else{
+    changeZustand(0);
+  }
+  
+  Serial.println(payloadString);
+
+}
+
+
+void setupOTA(){
+  // ArduinoOTA.setHostname("ESP8266");
+  // ArduinoOTA.setPassword("admin");
+
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_SPIFFS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+    Serial.println("Starte OTA Update: " + type);
+  });
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnde");
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Fehler[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Authentifizierung fehlgeschlagen");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Fehler beim Starten");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Fehler beim Verbinden");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Fehler beim Empfangen");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("Fehler beim Ende");
+    }
+  });
+
+  ArduinoOTA.begin();
+  Serial.println("OTA bereit");
 
 }
