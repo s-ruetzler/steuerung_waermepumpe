@@ -16,8 +16,11 @@ String mqttTopicPumpe;
 String mqttTopicSteuerung;
 String mqttTopicZustand;
 
-unsigned long lastTime = 0;
+unsigned long lastTimeMQTT= 0;
 unsigned long lastTimePumpe = 0;
+unsigned int timeOutPumpe = 0;
+unsigned long lastTimeSteuerung = 0;
+unsigned int timeOutSteuerung = 0;
 unsigned int timerDelay = 3000;
 bool configMode = false;
 bool wlanOpen = false;
@@ -30,9 +33,9 @@ const int OUTPUT_PIN = D6;
 const int INPUT_PIN = D5;
 int zustandKompressorPin = LOW;
 int zustandKompressorPinAlt = LOW;
-int steuerungZustand = 0;
+bool heatingEnabled = false;
 const int prellzeit = 50;
-unsigned int lastMillisPrell = 0;
+unsigned long lastMillisPrell = 0;
 
 String ssidWLanSelf;
 String passwordWlanSelf;
@@ -100,42 +103,65 @@ void loop() {
     configMode = true;
   }
 
-  //Wenn eine WLAN verbindung hergestellt wurde und MQTT nicht verbunden ist, dann versucht er sich mit dem MQTT Broker zu verbinden.
+  //WLAN Verbindung hergestellt, aber noch keine Verbindung zum MQTT Broker
   if (!client.connected() && wlanConnected) {
-    if (millis() - lastTime > timerDelay)
+    if (millis() - lastTimeMQTT> timerDelay)
     {
       Serial.println("Neu verbinden...");
       reconnect_mqtt();
-      lastTime = millis();
+      lastTimeMQTT= millis();
     }
   }
 
-  //Wenn die Pumpe länger als 20 Sekunden nichts sendet, dann wird der Zustand auf 0 gesetzt.
-  if (millis() - lastTimePumpe > 20000)
-  {
-    steuerungZustand = 0;
+  //Keine Verbindung zum MQTT Broker oder zum WLAN
+  if (!client.connected() || !wlanConnected){
+    if (zustand != "Error")
+    {
+      heatingEnabled = false;
+      changeZustand("Error");
+      Serial.println("Error: Keine Verbindung zum MQTT Broker oder zum WLAN");
+    }
+  }
+
+  //Wenn die Pumpe länger als 20 Sekunden nichts sendet
+  if (millis() - lastTimePumpe > 20000 || timeOutPumpe > 20000) {
+    heatingEnabled = false;
     if (zustand != "Error")
     {
       changeZustand("Error");
+      Serial.println("Error: Pumpe sendet keine Daten");
     }
   }
 
+  //Wenn die Steuerung länger als 40 Sekunden nichts sendet
+  if (millis() - lastTimeSteuerung > 40000 || timeOutSteuerung > 40000) {
+    heatingEnabled = false;
+    if (zustand != "Error")
+    {
+      changeZustand("Error");
+      Serial.println("Error: Steuerung sendet keine Daten");
+    }
+  }
+  //Signal entprellen
   if (zustandKompressorPin != zustandKompressorPinAlt){
     zustandKompressorPinAlt = zustandKompressorPin;
     lastMillisPrell = millis();
   }
 
+  //Wenn der Kompressor sich einschaltet, dann wird der Zustand auf "On" gesetzt.
   if (zustand == "Wait" && zustandKompressorPin == HIGH && millis() - lastMillisPrell > prellzeit)
   {
     changeZustand("On");
   }
 
+  //Wenn der Kompressor sich ausschaltet, dann wird der Zustand auf "Off" gesetzt.
   if (zustand == "On" && zustandKompressorPin == LOW && millis() - lastMillisPrell > prellzeit)
   {
     changeZustand("Wait");
   }
 
-  if (steuerungZustand == 1 && zustand == "Off")
+  //Wenn das Heizen aktiviert ist und der Zustand aus ist
+  if (heatingEnabled == true && zustand == "Off")
   {
     changeZustand("Error");
   }
@@ -235,7 +261,7 @@ void changeZustand(String newState){
 
   }
 
-  // Serial.println("Zustand: " + zustand);
+  Serial.println("Zustand: " + zustand);
   client.publish(mqttTopicZustand.c_str(), zustand.c_str(), true);
   
 }
@@ -294,6 +320,7 @@ void handlePayloadPumpe(byte* payload, unsigned int length){
     changeZustand("Off");
     return;
   }
+  timeOutPumpe = millis() - lastTimePumpe;
   lastTimePumpe = millis();
 
 
@@ -303,38 +330,38 @@ void handlePayloadPumpe(byte* payload, unsigned int length){
   if (value <= 10 && zustand == "On")
   {
     changeZustand("Off");
-  } else if (zustand == "Error" && steuerungZustand == 1 && value > 10){
+  } else if (zustand == "Error" && heatingEnabled == true && value > 10){
     changeZustand("Wait");
   }
 
 }
 
 void handlePayloadSteuerung(byte* payload, unsigned int length){
-
-
   String payloadString = "";
   for (unsigned int i = 0; i < length; i++) {
     payloadString += (char)payload[i];
   }
+  timeOutSteuerung = millis() - lastTimeSteuerung;
+  lastTimeSteuerung = millis();
   
   if (zustand == "Error"){
     if (payloadString == "true"){
-      steuerungZustand = 1;
+      heatingEnabled = true;
     } else{
-      steuerungZustand = 0;
+      heatingEnabled = true;
     }
 
   }else if (payloadString == "true")
   {
-    steuerungZustand = 1;
-    if (zustand =! "Wait")
+    heatingEnabled = true;
+    if (zustand != "Wait" && zustand != "On")
     {
       changeZustand("Wait");
     }
 
   } else{
-    steuerungZustand = 0;
-    if (zustand =! "Off")
+    heatingEnabled = false;
+    if (zustand != "Off")
     {
       changeZustand("Off");
     }
