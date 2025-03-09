@@ -100,3 +100,17 @@ form button:hover {
     margin: 10px 0;
     display: none;
 }
+
+.restart-button {
+    padding: 10px;
+    background-color: #FF0000;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+.restart-button:hover {
+    background-color: #CC0000;
+}

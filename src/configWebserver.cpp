@@ -39,6 +39,14 @@ void ConfigWebserver::SERVER(){
         request->send(200, "application/json", json);
     });
 
+    pServer->on("/restart", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
+        request->send(200, "text/plain", "Restarting...");
+        Serial.println("Restarting...");
+        delay(1000);
+        ESP.restart();
+    });
+
     pServer->onRequestBody([this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total){
         if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
         

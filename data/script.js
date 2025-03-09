@@ -145,4 +145,18 @@ function togglePasswordVisibility(fieldId) {
     }
 }
 
+function confirmRestart() {
+    if (confirm('Sind Sie sicher, dass Sie das System neu starten möchten?')) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/restart", true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                alert('Das System wird neu gestartet.');
+            }
+        }
+    }
+}
+
 window.addEventListener('load', datenLaden);
