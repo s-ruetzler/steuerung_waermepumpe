@@ -19,6 +19,9 @@ var passwortWlan;
 var radioDCHP;
 var radioSTATIC;
 var staticIpConfig;
+var ipAddress;
+var subnetMask;
+var gateway;
 
 //Website Daten
 var benutzernameWenbsite;
@@ -33,6 +36,9 @@ function datenSenden(formId) {
     // Überprüfen, ob alle Felder ausgefüllt sind
     for (let [key, value] of formData.entries()) {
         if (!value) {
+            if (formId === 'form-wlan' && document.getElementById('dhcp').checked && (key === 'ipAddress' || key === 'subnetMask' || key === 'gateway')) {
+                continue; // Überspringe die Überprüfung dieser Felder, wenn DHCP ausgewählt ist
+            }
             alert(`Bitte füllen Sie das Feld ${key} aus.`);
             return;
         }
@@ -87,7 +93,11 @@ function datenLaden() {
     radioDCHP.addEventListener('change', toggleIpConfig);
     radioSTATIC = document.getElementById('staticIp')
     radioSTATIC.addEventListener('change', toggleIpConfig);
+    ipAddress = document.getElementById("ipAddress");
+    subnetMask = document.getElementById("subnetMask");
+    gateway = document.getElementById("gateway");
 
+    //Website Daten
     benutzernameWenbsite = document.getElementById("benutzernameWebsite");
     passwortWebsite = document.getElementById("passwortWebsite");
     widerholenPasswortWebsite = document.getElementById("wiederholenPasswortWebsite");
@@ -106,6 +116,19 @@ function datenLaden() {
             mqttTopicZustand.setAttribute("value", response["mqttTopicZustand"]);
             updateErrorMessage(response["errorMessage"]);
             updatePinStatus(response["outputPinStatus"], response["inputPinStatus"]);
+            ipAddress.setAttribute("value", response["ipAddress"]);
+            subnetMask.setAttribute("value", response["subnetMask"]);
+            gateway.setAttribute("value", response["gateway"]);
+            ssid.setAttribute("value", response["ssid"]);
+
+            if (response["ipConfig"] === "dhcp") {
+                radioDCHP.checked = true;
+                toggleIpConfig();
+            }
+            else {
+                radioSTATIC.checked = true;
+                toggleIpConfig();
+            }
             
             // Hier kannst du die erhaltenen Daten weiterverarbeiten
             console.log(response);

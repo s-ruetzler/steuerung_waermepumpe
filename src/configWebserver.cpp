@@ -36,6 +36,11 @@ void ConfigWebserver::SERVER(){
         datenSenden["errorMessage"] = errorMessage;
         datenSenden["outputPinStatus"] = outputPinStatus;
         datenSenden["inputPinStatus"] = inputPinStatus;
+        datenSenden["ipConfig"] = config["ipConfig"];
+        datenSenden["ipAddress"] = config["ipAddress"];
+        datenSenden["subnetMask"] = config["subnetMask"];
+        datenSenden["gateway"] = config["gateway"];
+        datenSenden["ssid"] = config["ssid"];
 
         String json = "";
         serializeJson(datenSenden, json);
@@ -142,6 +147,10 @@ void ConfigWebserver::loadConfig(){
         config["mqttTopicZustand"] = "waermepumpe/state";
         config["ssid"] = "";
         config["passwortWlan"] = "";
+        config["ipConfig"] = "dhcp";
+        config["ipAddress"] = "";
+        config["subnetMask"] = "255.255.255.0";
+        config["gateway"] = "192.168.178.1";
         saveConfig();
 
         return;

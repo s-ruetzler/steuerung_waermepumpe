@@ -7,6 +7,7 @@
 #include <configWebserver.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
+#include <ESP8266mDNS.h>
 
 String mqtt_user;
 String mqtt_pass;
@@ -44,6 +45,15 @@ int intervalSteuerung = 40000; // Wie oft, wird von der Steuerung neue Daten erw
 
 String ssidWLanSelf;
 String passwordWlanSelf;
+const char* dns_name = "waermepumpe-pool";
+
+String ssid;
+String passwordWlan;
+String ipConfig;
+String ipAddress;
+String subnetMask;
+String gateway;
+
 String usernameWebsite;
 String passwordWebsite;
 
@@ -113,6 +123,8 @@ void loop() {
   //Wenn inerhalb von 20 Sekunden keine WLAN verbindung hergestellt werden kann, dann wird der ConfigMode gestartet.
   if ((!wlanConnected) && millis() > 20000){
     configMode = true;
+  } else{
+    configMode = false;
   }
 
   //WLAN Verbindung hergestellt, aber noch keine Verbindung zum MQTT Broker
@@ -159,8 +171,12 @@ void closeWLAN(){
 }
 
 void setup_wifi_mqtt(){
-  String wlanSsid = configServer->config["ssid"];
-  String wlanPasswort = configServer->config["passwortWlan"];
+  String tmpSsid = configServer->config["ssid"];
+  String tmpPWlan = configServer->config["passwortWlan"];
+  String tmpIPConfig = configServer->config["ipConfig"];
+  String tmpIPAdress = configServer->config["ipAddress"];
+  String tmpSubnetMask = configServer->config["subnetMask"];
+  String tmpGateway = configServer->config["gateway"];
 
   String tmpU = configServer->config["mqttBenutzername"];
   String tmpP = configServer->config["mqttPasswort"];
@@ -172,6 +188,13 @@ void setup_wifi_mqtt(){
   int tmpIP = configServer->config["intervalPumpe"];
   int tmpIS = configServer->config["intervalSteuerung"];
 
+
+  ssid = tmpSsid;
+  passwordWlan = tmpPWlan;
+  ipConfig = tmpIPConfig;
+  ipAddress = tmpIPAdress;
+  subnetMask = tmpSubnetMask;
+  gateway = tmpGateway;
   mqtt_user = tmpU;
   mqtt_pass = tmpP;
   mqtt_server = tmpS;
@@ -186,8 +209,22 @@ void setup_wifi_mqtt(){
   Serial.println(intervalPumpe);
   Serial.println(intervalSteuerung);
 
+  if (ipConfig == "static"){
+    IPAddress ip;
+    IPAddress subnet;
+    IPAddress gatewayIP;
+    IPAddress dnsIP;
+
+    ip.fromString(ipAddress);
+    subnet.fromString(subnetMask);
+    gatewayIP.fromString(gateway);
+    dnsIP.fromString(gateway); // Hier wird der Gateway auch als DNS-Server verwendet
+
+    WiFi.config(ip, gatewayIP, subnet, dnsIP);
+  }
+  WiFi.hostname("waermepumpe");
   WiFi.mode(WIFI_STA);
-  WiFi.begin(wlanSsid, wlanPasswort);
+  WiFi.begin(ssid, passwordWlan);
   delay(2000);
 
 }
@@ -415,6 +452,10 @@ void reconnect_mqtt() {
     client.subscribe(mqttTopicSteuerung.c_str());
     configServer->errorMessage = "Keine Fehlermeldung vorhanden";
     changeZustand("Off");
+    if (MDNS.begin(dns_name)) {
+      Serial.println("DNS gestartet, erreichbar unter: ");
+      Serial.println("http://" + String(dns_name) + ".local/");
+    }
   } else {
     // Wait 5 seconds before retrying
     Serial.print("failed, rc=");
