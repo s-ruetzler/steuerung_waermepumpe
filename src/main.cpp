@@ -79,7 +79,8 @@ void setup() {
   }
   readSecretFile();
 
-  configServer = new ConfigWebserver(&LittleFS, usernameWebsite, passwordWebsite);
+
+  configServer = new ConfigWebserver(&LittleFS, passwordWebsite, usernameWebsite);
   configServer->errorMessage = "Keine Fehlermeldung vorhanden";
 
   setup_wifi_mqtt();
@@ -168,6 +169,8 @@ void setup_wifi_mqtt(){
   String tmpTP = configServer->config["mqttTopicPumpe"];
   String tmpTS = configServer->config["mqttTopicSteuerung"];
   String tmpTZ = configServer->config["mqttTopicZustand"];
+  int tmpIP = configServer->config["intervalPumpe"];
+  int tmpIS = configServer->config["intervalSteuerung"];
 
   mqtt_user = tmpU;
   mqtt_pass = tmpP;
@@ -176,6 +179,12 @@ void setup_wifi_mqtt(){
   mqttTopicPumpe = tmpTP;
   mqttTopicSteuerung = tmpTS;
   mqttTopicZustand = tmpTZ;
+  intervalPumpe = tmpIP;
+  intervalSteuerung = tmpIS;
+
+
+  Serial.println(intervalPumpe);
+  Serial.println(intervalSteuerung);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(wlanSsid, wlanPasswort);

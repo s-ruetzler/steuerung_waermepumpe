@@ -1,4 +1,5 @@
 #include <configWebserver.h>
+#include <ArduinoJson.h>
 
 void ConfigWebserver::SERVER(){
     pServer->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -28,7 +29,9 @@ void ConfigWebserver::SERVER(){
         datenSenden["mqttBroker"] = config["mqttBroker"];
         datenSenden["mqttPort"] = config["mqttPort"];
         datenSenden["mqttTopicPumpe"] = config["mqttTopicPumpe"];
+        datenSenden["intervalPumpe"] = config["intervalPumpe"];
         datenSenden["mqttTopicSteuerung"] = config["mqttTopicSteuerung"];
+        datenSenden["intervalSteuerung"] = config["intervalSteuerung"];
         datenSenden["mqttTopicZustand"] = config["mqttTopicZustand"];
         datenSenden["errorMessage"] = errorMessage;
         datenSenden["outputPinStatus"] = outputPinStatus;
@@ -96,6 +99,23 @@ void ConfigWebserver::SERVER(){
 void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
     // Serial.println(daten.as<String>());
 
+    if (daten.containsKey("benutzername")) {
+        File secretFile = dateisystem->open("/json/secret.json", "w");
+        if (!secretFile) {
+            Serial.println("Failed to open secret file for writing");
+            return;
+        }
+
+        DynamicJsonDocument secretJson(1024);
+        secretJson["usernameWebsite"] = daten["benutzername"];
+        secretJson["passwordWebsite"] = daten["neuesPasswort"];
+
+        serializeJson(secretJson, secretFile);
+        secretFile.close();
+        Serial.println("Secret file updated");
+        return;
+    }
+
     for (JsonPair kv : daten.as<JsonObject>()) {
         const char* key = kv.key().c_str();
         Serial.println(key);
@@ -103,10 +123,7 @@ void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
         
     }
 
-
-
     saveConfig();
-    
 }
 
 
@@ -119,7 +136,9 @@ void ConfigWebserver::loadConfig(){
         config["mqttBenutzername"] = "";
         config["mqttPasswort"] = "";
         config["mqttTopicPumpe"] = "stat/tasmota_test/STATUS8";
+        config["intervalPumpe"] = 20000;
         config["mqttTopicSteuerung"] = "waermepumpe/enable";
+        config["intervalSteuerung"] = 40000;
         config["mqttTopicZustand"] = "waermepumpe/state";
         config["ssid"] = "";
         config["passwortWlan"] = "";

@@ -2,27 +2,20 @@
 
 //Mqtt Daten
 var mqttBroker;
-var changeMqttBroker;
 var mqttPort;
-var changeMqttPort;
 var mqttBenutzername;
-var changeMqttBenutzername;
 var mqttPasswort;
-var changeMqttPasswort;
 
 //Mqtt Topics
 var mqttTopicPumpe;
-var changeMqttTopicPumpe;
+var intervalPumpe;
 var mqttTopicSteuerung;
-var changeMqttTopicSteuerung;
+var intervalSeuerung;
 var mqttTopicZustand;
-var changeMqttTopicZustand;
 
 //Wlan Daten
 var ssid;
-var changeSsid;
 var passwortWlan;
-var changePasswortWlan;
 var radioDCHP;
 var radioSTATIC;
 var staticIpConfig;
@@ -37,6 +30,14 @@ function datenSenden(formId) {
     const formData = new FormData(form);
     const data = {};
 
+    // Überprüfen, ob alle Felder ausgefüllt sind
+    for (let [key, value] of formData.entries()) {
+        if (!value) {
+            alert(`Bitte füllen Sie das Feld ${key} aus.`);
+            return;
+        }
+    }
+    
     // Überprüfen, ob das Passwort-Wiederholen-Feld mit dem neuen Passwort übereinstimmt
     if (formId === 'form-benutzer') {
         const neuesPasswort = formData.get('neuesPasswort');
@@ -60,7 +61,7 @@ function datenSenden(formId) {
     xhr.onreadystatechange = function() {
         if (xhr.readyState == 4 && xhr.status == 200) {
             console.log(xhr.responseText);
-            alert('Daten wurden erfolgreich gespeichert.');
+            alert('Daten wurden erfolgreich gespeichert. Um diese Änderungen zu übernehmen, starten Sie das System neu.');
         }
     }
 }
@@ -75,6 +76,9 @@ function datenLaden() {
     mqttTopicPumpe = document.getElementById("mqttTopicPumpe");
     mqttTopicSteuerung = document.getElementById("mqttTopicSteuerung");
     mqttTopicZustand = document.getElementById("mqttTopicZustand");
+
+    intervalPumpe = document.getElementById("intervalPumpe");
+    intervalSeuerung = document.getElementById("intervalSteuerung");
 
     //Wlan Daten
     ssid = document.getElementById("ssid");
@@ -96,7 +100,9 @@ function datenLaden() {
             mqttBroker.setAttribute("value", response["mqttBroker"]);
             mqttPort.setAttribute("value", response["mqttPort"]);
             mqttTopicPumpe.setAttribute("value", response["mqttTopicPumpe"]);
+            intervalPumpe.setAttribute("value", response["intervalPumpe"]);
             mqttTopicSteuerung.setAttribute("value", response["mqttTopicSteuerung"]);
+            intervalSeuerung.setAttribute("value", response["intervalSeuerung"]);
             mqttTopicZustand.setAttribute("value", response["mqttTopicZustand"]);
             updateErrorMessage(response["errorMessage"]);
             updatePinStatus(response["outputPinStatus"], response["inputPinStatus"]);
