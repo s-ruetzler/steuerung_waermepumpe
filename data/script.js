@@ -1,3 +1,6 @@
+// const { stat } = require("fs");
+
+//Mqtt Daten
 var mqttBroker;
 var changeMqttBroker;
 var mqttPort;
@@ -20,33 +23,35 @@ var ssid;
 var changeSsid;
 var passwortWlan;
 var changePasswortWlan;
+var radioDCHP;
+var radioSTATIC;
+var staticIpConfig;
 
+//Website Daten
+var benutzernameWenbsite;
+var passwortWebsite;
+var widerholenPasswortWebsite;
 
+function datenSenden(formId) {
+    const form = document.getElementById(formId);
+    const formData = new FormData(form);
+    const data = {};
 
-function datenSenden(){
+    // Überprüfen, ob das Passwort-Wiederholen-Feld mit dem neuen Passwort übereinstimmt
+    if (formId === 'form-benutzer') {
+        const neuesPasswort = formData.get('neuesPasswort');
+        const passwortWiederholen = formData.get('passwortWiederholen');
+        if (neuesPasswort !== passwortWiederholen) {
+            alert('Die Passwörter stimmen nicht überein.');
+            return;
+        }
+    }
 
-    //Mqtt Daten
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
 
-    var data = {
-        "mqttBroker": mqttBroker.value,
-        "changeMqttBroker": changeMqttBroker.checked,
-        "mqttPort": mqttPort.value,
-        "changeMqttPort": changeMqttPort.checked,
-        "mqttBenutzername": mqttBenutzername.value,
-        "changeMqttBenutzername": changeMqttBenutzername.checked,
-        "mqttPasswort": mqttPasswort.value,
-        "changeMqttPasswort": changeMqttPasswort.checked,
-        "mqttTopicPumpe": mqttTopicPumpe.value,
-        "changeMqttTopicPumpe": changeMqttTopicPumpe.checked,
-        "mqttTopicSteuerung": mqttTopicSteuerung.value,
-        "changeMqttTopicSteuerung": changeMqttTopicSteuerung.checked,
-        "mqttTopicZustand": mqttTopicZustand.value,
-        "changeMqttTopicZustand": changeMqttTopicZustand.checked,
-        "ssid": ssid.value,
-        "changeSsid": changeSsid.checked,
-        "passwortWlan": passwortWlan.value,
-        "changePasswortWlan": changePasswortWlan.checked
-    };
+    console.log(data);
 
     var xhr = new XMLHttpRequest();
     xhr.open("POST", "/neueDaten", true);
@@ -55,37 +60,34 @@ function datenSenden(){
     xhr.onreadystatechange = function() {
         if (xhr.readyState == 4 && xhr.status == 200) {
             console.log(xhr.responseText);
+            alert('Daten wurden erfolgreich gespeichert.');
         }
     }
-    
 }
 
-function datenLaden(){
-
+function datenLaden() {
     mqttBroker = document.getElementById("mqttBroker");
-    changeMqttBroker = document.getElementById("changeMqttBroker");
     mqttPort = document.getElementById("mqttPort");
-    changeMqttPort = document.getElementById("changeMqttPort");
     mqttBenutzername = document.getElementById("mqttBenutzername");
-    changeMqttBenutzername = document.getElementById("changeBenutzername");
     mqttPasswort = document.getElementById("mqttPasswort");
-    changeMqttPasswort = document.getElementById("changePasswort");
 
     //Mqtt Topics
-    mqttTopicPumpe = document.getElementById("mqttHeartBeat");
-    changeMqttTopicPumpe = document.getElementById("changeMqttHearbeat");
-    mqttTopicSteuerung = document.getElementById("mqttSteuerung");
-    changeMqttTopicSteuerung = document.getElementById("changeMqttSteuerung");
-    mqttTopicZustand = document.getElementById("mqttZustand");
-    changeMqttTopicZustand = document.getElementById("changeMqttZustand");
+    mqttTopicPumpe = document.getElementById("mqttTopicPumpe");
+    mqttTopicSteuerung = document.getElementById("mqttTopicSteuerung");
+    mqttTopicZustand = document.getElementById("mqttTopicZustand");
 
     //Wlan Daten
     ssid = document.getElementById("ssid");
-    changeSsid = document.getElementById("changeSsid");
     passwortWlan = document.getElementById("passwortWlan");
-    changePasswortWlan = document.getElementById("changePasswortWlan");
+    radioDCHP = document.getElementById('dhcp')
+    radioDCHP.addEventListener('change', toggleIpConfig);
+    radioSTATIC = document.getElementById('staticIp')
+    radioSTATIC.addEventListener('change', toggleIpConfig);
 
-
+    benutzernameWenbsite = document.getElementById("benutzernameWebsite");
+    passwortWebsite = document.getElementById("passwortWebsite");
+    widerholenPasswortWebsite = document.getElementById("wiederholenPasswortWebsite");
+   
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/daten", true);
     xhr.onreadystatechange = function() {
@@ -96,12 +98,51 @@ function datenLaden(){
             mqttTopicPumpe.setAttribute("value", response["mqttTopicPumpe"]);
             mqttTopicSteuerung.setAttribute("value", response["mqttTopicSteuerung"]);
             mqttTopicZustand.setAttribute("value", response["mqttTopicZustand"]);
+            updateErrorMessage(response["errorMessage"]);
+            updatePinStatus(response["outputPinStatus"], response["inputPinStatus"]);
             
             // Hier kannst du die erhaltenen Daten weiterverarbeiten
             console.log(response);
         }
     }
     xhr.send();
+}
+
+function toggleIpConfig() {
+    const staticIpConfig = document.getElementById('staticIpConfig');
+    if (document.getElementById('staticIp').checked) {
+        staticIpConfig.style.display = 'block';
+    } else {
+        staticIpConfig.style.display = 'none';
+    }
+}
+
+function updateErrorMessage(message) {
+    const errorMessagesDiv = document.getElementById('error-messages');
+    errorMessagesDiv.innerHTML = ''; // Vorherige Fehlermeldungen löschen
+    const p = document.createElement('p');
+    p.textContent = message;
+    errorMessagesDiv.appendChild(p);
+}
+
+// Beispielaufruf
+// updateErrorMessages(['Fehler 1: Verbindung verloren', 'Fehler 2: Sensor nicht gefunden']);
+
+function updatePinStatus(outputStatus, inputStatus) {
+    document.getElementById('output-pin-status').textContent = outputStatus;
+    document.getElementById('input-pin-status').textContent = inputStatus;
+}
+
+// Beispielaufruf
+// updatePinStatus('HIGH', 'LOW');
+
+function togglePasswordVisibility(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (field.type === 'password') {
+        field.type = 'text';
+    } else {
+        field.type = 'password';
+    }
 }
 
 window.addEventListener('load', datenLaden);

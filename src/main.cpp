@@ -20,14 +20,17 @@ unsigned long lastTimeMQTT= 0;
 unsigned long lastTimePumpe = 0;
 unsigned int timeOutPumpe = 0;
 unsigned long lastTimeSteuerung = 0;
+unsigned long lastTimeChangeZustand = 0;
 unsigned int timeOutSteuerung = 0;
 unsigned int timerDelay = 3000;
 bool configMode = false;
 bool wlanOpen = false;
 bool wlanConnected = false;
-String zustand = "Off";
+String zustand = "Off"; //Off = 0, On = 1, Wait = 2, Error = 3
+int zustandNR = 0; //0 = Off, 1 = On, 2 = Wait, 3 = Error
 bool setupOTAaufgerufen = false;
 JsonDocument datenPumpe;
+int powerPumpe = 0;
 
 const int OUTPUT_PIN = D6;
 const int INPUT_PIN = D5;
@@ -36,6 +39,8 @@ int zustandKompressorPinAlt = LOW;
 bool heatingEnabled = false;
 const int prellzeit = 50;
 unsigned long lastMillisPrell = 0;
+int intervalPumpe = 20000; //Wie oft, wird von der Poolpumpe neue Daten erwartet
+int intervalSteuerung = 40000; // Wie oft, wird von der Steuerung neue Daten erwartet
 
 String ssidWLanSelf;
 String passwordWlanSelf;
@@ -59,6 +64,8 @@ void reconnect_mqtt(); //Mit MQTT Broker neu verbinden
 void handlePayloadPumpe(byte* payload, unsigned int length); //Payload von Pumpe verarbeiten
 void handlePayloadSteuerung(byte* payload, unsigned int length); //Payload von Steuerung verarbeiten
 void setupOTA(); // OTA einstellungen einrichten
+void logikChangeZustand(); //Logik des Programms
+bool fehlerVorhanden(); //Fehler überprüfen
 
 void setup() {
   Serial.begin(115200);
@@ -73,6 +80,7 @@ void setup() {
   readSecretFile();
 
   configServer = new ConfigWebserver(&LittleFS, usernameWebsite, passwordWebsite);
+  configServer->errorMessage = "Keine Fehlermeldung vorhanden";
 
   setup_wifi_mqtt();
 
@@ -82,6 +90,9 @@ void setup() {
 void loop() {
   wlanConnected = WiFi.status() == WL_CONNECTED;
   zustandKompressorPin = digitalRead(INPUT_PIN);
+  configServer->inputPinStatus = zustandKompressorPin;
+  configServer->outputPinStatus = digitalRead(OUTPUT_PIN);
+
   if (configMode){
     if (!wlanOpen){
       openWLAN();
@@ -113,61 +124,18 @@ void loop() {
     }
   }
 
-  //Keine Verbindung zum MQTT Broker oder zum WLAN
-  if (!client.connected() || !wlanConnected){
-    if (zustand != "Error")
-    {
-      heatingEnabled = false;
-      changeZustand("Error");
-      Serial.println("Error: Keine Verbindung zum MQTT Broker oder zum WLAN");
-    }
-  }
-
-  //Wenn die Pumpe länger als 20 Sekunden nichts sendet
-  if (millis() - lastTimePumpe > 20000 || timeOutPumpe > 20000) {
-    heatingEnabled = false;
-    if (zustand != "Error")
-    {
-      changeZustand("Error");
-      Serial.println("Error: Pumpe sendet keine Daten");
-    }
-  }
-
-  //Wenn die Steuerung länger als 40 Sekunden nichts sendet
-  if (millis() - lastTimeSteuerung > 40000 || timeOutSteuerung > 40000) {
-    heatingEnabled = false;
-    if (zustand != "Error")
-    {
-      changeZustand("Error");
-      Serial.println("Error: Steuerung sendet keine Daten");
-    }
-  }
   //Signal entprellen
   if (zustandKompressorPin != zustandKompressorPinAlt){
     zustandKompressorPinAlt = zustandKompressorPin;
     lastMillisPrell = millis();
   }
 
-  //Wenn der Kompressor sich einschaltet, dann wird der Zustand auf "On" gesetzt.
-  if (zustand == "Wait" && zustandKompressorPin == HIGH && millis() - lastMillisPrell > prellzeit)
-  {
-    changeZustand("On");
-  }
-
-  //Wenn der Kompressor sich ausschaltet, dann wird der Zustand auf "Off" gesetzt.
-  if (zustand == "On" && zustandKompressorPin == LOW && millis() - lastMillisPrell > prellzeit)
-  {
-    changeZustand("Wait");
-  }
-
-  //Wenn das Heizen aktiviert ist und der Zustand aus ist
-  if (heatingEnabled == true && zustand == "Off")
-  {
-    changeZustand("Error");
-  }
+  logikChangeZustand();
   client.loop();
   ArduinoOTA.handle();
 }
+
+
 
 
 void openWLAN(){
@@ -242,21 +210,33 @@ void readSecretFile(){
 
 void changeZustand(String newState){
 
+  lastTimeChangeZustand = millis();
+
+  if (zustand == "Error" && newState != "Error")
+  {
+    configServer->errorMessage = "Keine Fehlermeldung vorhanden";
+  }
+
   zustand = newState;
 
   if (zustand == "Off"){
+    zustandNR = 0;
+    heatingEnabled = false;
     digitalWrite(OUTPUT_PIN, LOW);
 
   } else if (zustand == "On"){
+    zustandNR = 1;
+    heatingEnabled = true;
+    lastTimePumpe = millis();
     digitalWrite(OUTPUT_PIN, HIGH);
 
   } else if (zustand == "Wait"){
+    zustandNR = 2;
+    heatingEnabled = true;
     digitalWrite(OUTPUT_PIN, HIGH);
 
-  } else if (zustand == "Error"){
-    digitalWrite(OUTPUT_PIN, LOW);
-
   } else{
+    zustandNR = 3;
     digitalWrite(OUTPUT_PIN, LOW);
 
   }
@@ -266,6 +246,128 @@ void changeZustand(String newState){
   
 }
 
+void logikChangeZustand(){
+
+
+  if (zustand != "Error")
+  {
+    fehlerVorhanden(); // Es wird einmal überprüft, ob ein Fehler vorhanden ist
+  }
+  
+  switch (zustandNR)
+  {
+  case 0: // Off
+    //Wenn das Heizen aktiviert ist und der Zustand aus ist
+    if (heatingEnabled == true)
+    {
+      // changeZustand("Error");
+      Serial.println("Info: Heizen aktiviert, aber Zustand ist aus");
+      // configServer->errorMessage = "Heizen aktiviert, aber Zustand ist aus";
+    }
+    break;
+
+  case 1: // On
+    //Wenn der Kompressor sich ausschaltet, dann wird der Zustand auf "Off" gesetzt.
+    if (zustandKompressorPin == LOW && millis() - lastMillisPrell > prellzeit)
+    {
+      changeZustand("Wait");
+    }
+
+
+    //Wenn die Poolpumpe weniger als 10 Watt verbraucht, dann wird der Zustand auf "Off" gesetzt.
+    if (powerPumpe <= 10 && millis() - lastTimeChangeZustand > intervalPumpe) //Hier ist noch ien fehler in der Logik
+    {
+      changeZustand("Off");
+      // Serial.println("Eror: Die PoolPumpe geht nicht an!");
+      // configServer->errorMessage = "Die Poolpumpe geht nicht an!";
+    }
+
+    break;
+
+  case 2: // Wait
+    //Wenn der Kompressor sich einschaltet, dann wird der Zustand auf "On" gesetzt.
+    if (zustandKompressorPin == HIGH && millis() - lastMillisPrell > prellzeit)
+    {
+      changeZustand("On");
+    }  
+
+    break;
+
+  case 3: // Error
+
+    //Wenn weiterhin ein Fehler vorhanden ist, dann passiert nichts
+    if (fehlerVorhanden())
+    {
+      break;
+    }
+
+    // Wenn das Heizen aktiviert ist und die Poolpumpe mehr als 10 Watt verbraucht, dann wird der Zustand auf "Wait" gesetzt.
+    // if (heatingEnabled == true && powerPumpe < 10){
+    //   break;
+    // }
+
+    //Wenn der Code bis hier hin kommt, bedeutet es, dass keine Fehler mehr vorhanden sind.
+    //Je nach Statuscode wird dann der Zustand geändert.
+    if (heatingEnabled)
+    {
+      changeZustand("Wait");
+    } else{
+      changeZustand("Off");
+    }
+
+    break;
+  
+  default:
+    break;
+  }
+
+ 
+
+
+}
+
+//Hier wird überprüft ob ein Fehler vorhanden ist
+
+bool fehlerVorhanden(){
+
+  //Keine Verbindung zum MQTT Broker oder zum WLAN
+  if (!client.connected() || !wlanConnected){
+    if (zustand != "Error")
+    {
+      changeZustand("Error");
+      Serial.println("Error: Keine Verbindung zum MQTT Broker oder zum WLAN");
+      configServer->errorMessage = "Es konnte keine Verbindung zum MQTT Broker oder zum WLAN hergestellt werden";
+
+    }
+    return true;
+  }
+
+  //Wenn die Pumpe länger als 20 Sekunden keine Daten sendet
+  if (millis() - lastTimePumpe > intervalPumpe || timeOutPumpe > intervalPumpe) {
+    if (zustand != "Error")
+    {
+      changeZustand("Error");
+      Serial.println("Error: Pumpe sendet keine Daten");
+      configServer->errorMessage = "Die Poolpumpe sendet keine Daten";
+
+    }
+    return true;
+  }
+
+  //Wenn die Steuerung länger als 40 Sekunden keine sendet
+  if (millis() - lastTimeSteuerung > intervalSteuerung || timeOutSteuerung > intervalSteuerung) {
+    if (zustand != "Error")
+    {
+      changeZustand("Error");
+      Serial.println("Error: Steuerung sendet keine Daten");
+      configServer->errorMessage = "Die Steuerung sendet keine Daten";
+
+    }
+    return true;
+  }
+
+  return false;
+}
 
 void callback_mqtt(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
@@ -285,9 +387,7 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
 
 }
 
-
 void reconnect_mqtt() {
-
   client.setServer(mqtt_server.c_str(), mqtt_port);
   client.setBufferSize(2048);
   client.setCallback(callback_mqtt);
@@ -304,6 +404,8 @@ void reconnect_mqtt() {
     // ... and resubscribe
     client.subscribe(mqttTopicPumpe.c_str());
     client.subscribe(mqttTopicSteuerung.c_str());
+    configServer->errorMessage = "Keine Fehlermeldung vorhanden";
+    changeZustand("Off");
   } else {
     // Wait 5 seconds before retrying
     Serial.print("failed, rc=");
@@ -324,16 +426,10 @@ void handlePayloadPumpe(byte* payload, unsigned int length){
   lastTimePumpe = millis();
 
 
-  int value = datenPumpe["StatusSNS"]["ENERGY"]["Power"];
+  powerPumpe = datenPumpe["StatusSNS"]["ENERGY"]["Power"];
   // Serial.println(value);
 
-  if (value <= 10 && zustand == "On")
-  {
-    changeZustand("Off");
-  } else if (zustand == "Error" && heatingEnabled == true && value > 10){
-    changeZustand("Wait");
-  }
-
+  
 }
 
 void handlePayloadSteuerung(byte* payload, unsigned int length){
@@ -348,19 +444,17 @@ void handlePayloadSteuerung(byte* payload, unsigned int length){
     if (payloadString == "true"){
       heatingEnabled = true;
     } else{
-      heatingEnabled = true;
+      heatingEnabled = false;
     }
 
   }else if (payloadString == "true")
   {
-    heatingEnabled = true;
     if (zustand != "Wait" && zustand != "On")
     {
       changeZustand("Wait");
     }
 
   } else{
-    heatingEnabled = false;
     if (zustand != "Off")
     {
       changeZustand("Off");

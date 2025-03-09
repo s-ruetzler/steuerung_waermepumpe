@@ -1,105 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Config Wärmepumpe Pool</title>
-    <script src="script.js"></script>
-    <!-- <link rel="stylesheet" href="style.css" /> -->
-</head>
-<body>    
-    <h1>Config Wärmepumpe Pool</h1>
-    <form>
-        <div>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Wärmepumpe Pool</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="style.css"/>
+        <script src="script.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    </head>
+    <body>
+        <nav>
+            <ul>
+                <li><a href="#info">Info</a></li>
+                <li><a href="#config-mqtt">Config MQTT</a></li>
+                <li><a href="#config-wlan">Config WLAN</a></li>
+                <li><a href="#config-benutzer">Config Benutzer</a></li>
+            </ul>
+        </nav>
+        
+        <section id="info">
+            <h2>Info</h2>
+            <p>
+                OUTPUT_PIN: D6: <span id="output-pin-status">HIGH</span> <br>
+                INPUT_PIN: D5: <span id="input-pin-status">LOW</span> <br>
+            </p>
+            <div id="error-messages">
+                <!-- Fehlermeldungen werden hier angezeigt -->
+            </div>
+        </section>
+        
+        <section id="config-mqtt">
             <h2>Config MQTT</h2>
-        </div>
-        <div>
-            MQTT Broker:<br>
-            <input type="text" name="mqttBroker" id="mqttBroker">
-            <br>
-            <input type="checkbox" name="mqttBrokerC" value="change" id="changeMqttBroker">
-            <label for="mqttBrokerC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            MQTT Port:<br>
-            <input type="text" name="mqttPort" id="mqttPort">
-            <br>
-            <input type="checkbox" name="mqttPortC" value="change" id="changeMqttPort">
-            <label for="mqttPortC">Change Inputs</label>
-        </div>
-        <br>
-
-        <div>
-            Benutzername MQTT Broker:<br>
-            <input type="text" name="mqttBenutzername" id="mqttBenutzername">
-            <br>
-            <input type="checkbox" name="mqttBenutzernameC" value="change"id="changeBenutzername">
-            <label for="mqttBenutzernameC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            Passwort MQTT Broker:<br>
-            <input type="password" name="mqttPasswort" id="mqttPasswort">
-            <br>
-            <input type="checkbox" name="mqttPasswortC" value="change" id="changePasswort">
-            <label for="mqttPasswortC">Change Inputs</label>
-        </div>
-            <br>
-        <div>
-            MQTT Topic für Heartbeat:<br>
-            <input type="text" name="mqttTopic" id="mqttHeartBeat" ">
-            <br>
-            <input type="checkbox" name="mqttTopicC" value="change" id="changeMqttHearbeat">
-            <label for="mqttTopicC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            MQTT Tobic für Befehle:<br>
-            <input type="text" name="mqttBefehl" id="mqttSteuerung">
-            <br>
-            <input type="checkbox" name="mqttBefehlC" value="change" id="changeMqttSteuerung">
-            <label for="mqttBefehlC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            MQTT Topic für Zustand:<br>
-            <input type="text" name="mqttZustand" id="mqttZustand">
-            <br>
-            <input type="checkbox" name="mqttZustandC" value="change" id="changeMqttZustand">
-            <label for="mqttZustandC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
+            <form id="form-mqtt">
+                <label for="mqttBroker">Broker URL:</label>
+                <input type="text" id="mqttBroker" name="mqttBroker"><br>
+                
+                <label for="mqttPort">Port:</label>
+                <input type="text" id="mqttPort" name="mqttPort"><br>
+                
+                <label for="mqttBenutzername">Benutzername:</label>
+                <input type="text" id="mqttBenutzername" name="mqttBenutzername"><br>
+                
+                <label for="mqttPasswort">Passwort:</label>
+                <div class="password-container">
+                    <input type="password" id="mqttPasswort" name="mqttPasswort">
+                    <i class="fas fa-eye" onclick="togglePasswordVisibility('mqttPasswort')"></i>
+                </div><br>
+                
+                <label for="mqttTopicPumpe">Topic Heartbeat Steckdose:</label>
+                <input type="text" id="mqttTopicPumpe" name="mqttTopicPumpe"><br>
+                
+                <label for="mqttTopicSteuerung">Topic Befehle:</label>
+                <input type="text" id="mqttTopicSteuerung" name="mqttTopicSteuerung"><br>
+                
+                <label for="mqttTopicZustand">Topic Aktueller Zustand:</label>
+                <input type="text" id="mqttTopicZustand" name="mqttTopicZustand"><br>
+                
+                <button type="button" onclick="datenSenden('form-mqtt')">Speichern</button>
+            </form>
+        </section>
+        
+        <section id="config-wlan">
             <h2>Config WLAN</h2>
-        </div>
-        <div>
-            SSID WLAN:<br>
-            <input type="text" name="ssid" id="ssid">
-            <br>
-            <input type="checkbox" name="ssidC" value="change" id="changeSsid">
-            <label for="ssidC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            Passwort WLAN:<br>
-            <input type="password" name="passwort" id="passwortWlan">
-            <br>
-            <input type="checkbox" name="passwortC" value="change" id="changePasswortWlan">
-            <label for="passwortC">Change Inputs</label>
-        </div>
-        <br>
-        <div>
-            <button type="button" onclick="datenSenden()">Save</button>
-        </div>
-
-    </form><br>
-
-       
-</body>
-<footer style="margin-top: 20px;">
-    <iframe name="hidden-form" style="display: none;"></iframe>
-    <p>© 2024 by Henri Rützler</p>
-
-</footer> 
+            <form id="form-wlan">
+                <label for="ssid">SSID WLAN:</label>
+                <input type="text" id="ssid" name="ssid"><br>
+                
+                <label for="passwortWlan">Passwort WLAN:</label>
+                <div class="password-container">
+                    <input type="password" id="passwortWlan" name="passwortWlan">
+                    <i class="fas fa-eye" onclick="togglePasswordVisibility('passwortWlan')"></i>
+                </div><br>
+                
+                <div class="radio-group">
+                    <input type="radio" id="dhcp" name="ipConfig" value="dhcp" checked>
+                    <label for="dhcp">DHCP</label>
+                    
+                    <input type="radio" id="staticIp" name="ipConfig" value="static">
+                    <label for="staticIp">Statische IP</label>
+                </div>
+                
+                <div id="staticIpConfig" class="static-ip-config" style="display: none;">
+                    <label for="ipAddress">IP-Adresse:</label>
+                    <input type="text" id="ipAddress" name="ipAddress"><br>
+                    
+                    <label for="subnetMask">Subnetzmaske:</label>
+                    <input type="text" id="subnetMask" name="subnetMask"><br>
+                    
+                    <label for="gateway">Gateway:</label>
+                    <input type="text" id="gateway" name="gateway"><br>
+                </div>
+                
+                <button type="button" onclick="datenSenden('form-wlan')">Speichern</button>
+            </form>
+        </section>
+        
+        <section id="config-benutzer">
+            <h2>Config Benutzer</h2>
+            <form id="form-benutzer">
+                <label for="benutzernameWebsite">Benutzername ändern:</label>
+                <input type="text" id="benutzernameWebsite" name="benutzername"><br>
+                
+                <label for="passwortWebsite">Passwort ändern:</label>
+                <div class="password-container">
+                    <input type="password" id="passwortWebsite" name="neuesPasswort">
+                    <i class="fas fa-eye" onclick="togglePasswordVisibility('passwortWebsite')"></i>
+                </div><br>
+                
+                <label for="wiederholenPasswortWebsite">Passwort wiederholen:</label>
+                <div class="password-container">
+                    <input type="password" id="wiederholenPasswortWebsite" name="passwortWiederholen">
+                    <i class="fas fa-eye" onclick="togglePasswordVisibility('wiederholenPasswortWebsite')"></i>
+                </div><br>
+                
+                <button type="button" onclick="datenSenden('form-benutzer')">Speichern</button>
+            </form>
+        </section>
+        
+        <div id="notification" class="notification">Daten wurden erfolgreich gespeichert.</div>
+    </body>
 </html>

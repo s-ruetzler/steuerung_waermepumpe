@@ -30,13 +30,13 @@ void ConfigWebserver::SERVER(){
         datenSenden["mqttTopicPumpe"] = config["mqttTopicPumpe"];
         datenSenden["mqttTopicSteuerung"] = config["mqttTopicSteuerung"];
         datenSenden["mqttTopicZustand"] = config["mqttTopicZustand"];
-
+        datenSenden["errorMessage"] = errorMessage;
+        datenSenden["outputPinStatus"] = outputPinStatus;
+        datenSenden["inputPinStatus"] = inputPinStatus;
 
         String json = "";
         serializeJson(datenSenden, json);
         request->send(200, "application/json", json);
-
-        
     });
 
     pServer->onRequestBody([this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total){
@@ -55,7 +55,7 @@ void ConfigWebserver::SERVER(){
                 // Serial.println(buffer);
 
                 deserializeJson(neueDaten, buffer);
-                // Serial.println(neueDaten.as<String>());
+                Serial.println(neueDaten.as<String>());
                 neueDatenVerarbeiten(neueDaten);
                 request->send(200, "text/plain", "Daten empfangen");
 
@@ -88,33 +88,13 @@ void ConfigWebserver::SERVER(){
 void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
     // Serial.println(daten.as<String>());
 
-    if(daten["changeMqttBroker"]){
-        config["mqttBroker"] = daten["mqttBroker"];
+    for (JsonPair kv : daten.as<JsonObject>()) {
+        const char* key = kv.key().c_str();
+        Serial.println(key);
+        config[key] = daten[key];
+        
     }
-    if(daten["changeMqttPort"]){
-        config["mqttPort"] = daten["mqttPort"];
-    }
-    if(daten["changeMqttBenutzername"]){
-        config["mqttBenutzername"] = daten["mqttBenutzername"];
-    }
-    if(daten["changeMqttPasswort"]){
-        config["mqttPasswort"] = daten["mqttPasswort"];
-    }
-    if(daten["changeMqttTopicPumpe"]){
-        config["mqttTopicPumpe"] = daten["mqttTopicPumpe"];
-    }
-    if(daten["changeMqttTopicSteuerung"]){
-        config["mqttTopicSteuerung"] = daten["mqttTopicSteuerung"];
-    }
-    if(daten["changeMqttTopicZustand"]){
-        config["mqttTopicZustand"] = daten["mqttTopicZustand"];
-    }
-    if(daten["changeSsid"]){
-        config["ssid"] = daten["ssid"];
-    }
-    if(daten["changePasswortWlan"]){
-        config["passwortWlan"] = daten["passwortWlan"];
-    }
+
 
 
     saveConfig();
@@ -130,9 +110,9 @@ void ConfigWebserver::loadConfig(){
         config["mqttPort"] = 8883;
         config["mqttBenutzername"] = "";
         config["mqttPasswort"] = "";
-        config["mqttTopicPumpe"] = "tele/tasmota_3094E0/SENSOR";
-        config["mqttTopicSteuerung"] = "waermepumpe/steuerung";
-        config["mqttTopicZustand"] = "waermepumpe/zustand";
+        config["mqttTopicPumpe"] = "stat/tasmota_test/STATUS8";
+        config["mqttTopicSteuerung"] = "waermepumpe/enable";
+        config["mqttTopicZustand"] = "waermepumpe/state";
         config["ssid"] = "";
         config["passwortWlan"] = "";
         saveConfig();
@@ -158,7 +138,7 @@ void ConfigWebserver::loadConfig(){
 
         return;
     }
-    // Serial.println(config.as<String>());
+    Serial.println(config.as<String>());
 }
 
 void ConfigWebserver::saveConfig(){
@@ -170,5 +150,5 @@ void ConfigWebserver::saveConfig(){
 
     serializeJson(config, configFile);
     configFile.close();
-    // Serial.println(config.as<String>());
+    Serial.println(config.as<String>());
 }
