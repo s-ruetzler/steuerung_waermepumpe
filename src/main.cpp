@@ -27,8 +27,8 @@ unsigned int timerDelay = 3000;
 bool configMode = false;
 bool wlanOpen = false;
 bool wlanConnected = false;
-String zustand = "Off"; //Off = 0, On = 1, Wait = 2, Error = 3
-int zustandNR = 0; //0 = Off, 1 = On, 2 = Wait, 3 = Error
+String zustand = "Off"; //Off = 0, On = 1, Wait = 2, Error = 3, Wait_Pumpe = 4
+int zustandNR = 0; //0 = Off, 1 = On, 2 = Wait, 3 = Error, 4 = Wait_Pumpe
 bool setupOTAaufgerufen = false;
 JsonDocument datenPumpe;
 int powerPumpe = 0;
@@ -276,15 +276,19 @@ void changeZustand(String newState){
     lastTimePumpe = millis();
     digitalWrite(OUTPUT_PIN, HIGH);
 
-  } else if (zustand == "Wait"){
+  } else if (zustand == "Wait_Kompressor"){
     zustandNR = 2;
     heatingEnabled = true;
     digitalWrite(OUTPUT_PIN, HIGH);
 
-  } else{
+  } else if (zustand == "Error"){
     zustandNR = 3;
     digitalWrite(OUTPUT_PIN, LOW);
 
+  }
+  else if (zustand == "Wait_Pumpe"){
+    zustandNR = 4;
+    digitalWrite(OUTPUT_PIN, LOW);
   }
 
   Serial.println("Zustand: " + zustand);
@@ -313,17 +317,17 @@ void logikChangeZustand(){
     break;
 
   case 1: // On
-    //Wenn der Kompressor sich ausschaltet, dann wird der Zustand auf "Off" gesetzt.
+    //Wenn der Kompressor sich ausschaltet, dann wird der Zustand auf "Wait_Kompressor" gesetzt.
     if (zustandKompressorPin == LOW && millis() - lastMillisPrell > prellzeit)
     {
-      changeZustand("Wait");
+      changeZustand("Wait_Kompressor");
     }
 
 
-    //Wenn die Poolpumpe weniger als 10 Watt verbraucht, dann wird der Zustand auf "Off" gesetzt.
-    if (powerPumpe <= 10 && millis() - lastTimeChangeZustand > intervalPumpe) //Hier ist noch ien fehler in der Logik
+    //Wenn die Poolpumpe weniger als 10 Watt verbraucht, dann wird der Zustand auf "Wait_Pumpe" gesetzt.
+    if (powerPumpe <= 10 && millis() - lastTimeChangeZustand > intervalPumpe)
     {
-      changeZustand("Off");
+      changeZustand("Wait_Pumpe");
       // Serial.println("Eror: Die PoolPumpe geht nicht an!");
       // configServer->errorMessage = "Die Poolpumpe geht nicht an!";
     }
@@ -347,7 +351,7 @@ void logikChangeZustand(){
       break;
     }
 
-    // Wenn das Heizen aktiviert ist und die Poolpumpe mehr als 10 Watt verbraucht, dann wird der Zustand auf "Wait" gesetzt.
+    // Wenn das Heizen aktiviert ist und die Poolpumpe weniger als 10 Watt verbraucht, dann wird der Zustand auf "Wait_Kompressor" gesetzt.
     // if (heatingEnabled == true && powerPumpe < 10){
     //   break;
     // }
@@ -356,12 +360,20 @@ void logikChangeZustand(){
     //Je nach Statuscode wird dann der Zustand geändert.
     if (heatingEnabled)
     {
-      changeZustand("Wait");
+      changeZustand("Wait_Kompressor");
     } else{
       changeZustand("Off");
     }
 
     break;
+
+  case 4: //Wait_Pumpe
+    //Wenn die Pumoe wieder anfängt zu laufen, dann wird der Zustand auf "Wait_Kompressor" gesetzt.
+    if (powerPumpe > 10){
+      changeZustand("Wait_Kompressor");
+    }
+    break;
+
   
   default:
     break;
@@ -499,9 +511,9 @@ void handlePayloadSteuerung(byte* payload, unsigned int length){
 
   }else if (payloadString == "true")
   {
-    if (zustand != "Wait" && zustand != "On")
+    if (zustand != "Wait_Kompressor" && zustand != "On" && zustand != "Wait_Pumpe")
     {
-      changeZustand("Wait");
+      changeZustand("Wait_Kompressor");
     }
 
   } else{
