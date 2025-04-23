@@ -117,6 +117,7 @@ void loop() {
 
   if (!setupOTAaufgerufen && wlanConnected){
     setupOTA();
+    Serial.println("OTA bereit");
     setupOTAaufgerufen = true;
   }
 
@@ -529,8 +530,8 @@ void handlePayloadSteuerung(byte* payload, unsigned int length){
 
 
 void setupOTA(){
-  // ArduinoOTA.setHostname("ESP8266");
-  // ArduinoOTA.setPassword("admin");
+  ArduinoOTA.setHostname("ESP8266");
+  ArduinoOTA.setPassword("Start123");
 
   ArduinoOTA.onStart([]() {
     String type;
@@ -539,35 +540,35 @@ void setupOTA(){
     } else { // U_SPIFFS
       type = "filesystem";
     }
-
-    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
     Serial.println("Starte OTA Update: " + type);
   });
 
   ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnde");
+    Serial.println("\nOTA Update abgeschlossen");
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    Serial.printf("OTA Fortschritt: %u%%\r", (progress / (total / 100)));
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Fehler[%u]: ", error);
+    Serial.printf("OTA Fehler [%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("Authentifizierung fehlgeschlagen");
+      Serial.println("Authentifizierungsfehler");
     } else if (error == OTA_BEGIN_ERROR) {
       Serial.println("Fehler beim Starten");
     } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Fehler beim Verbinden");
+      Serial.println("Verbindungsfehler - Bitte prüfen Sie die Netzwerkstabilität");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Fehler beim Empfangen");
+      Serial.println("Empfangsfehler - Möglicherweise ist der OTA-Buffer zu klein");
     } else if (error == OTA_END_ERROR) {
-      Serial.println("Fehler beim Ende");
+      Serial.println("Fehler beim Abschluss - Speicherplatz könnte knapp sein");
     }
   });
 
+  // OTA-Buffergröße erhöhen
+  ArduinoOTA.setPort(8266); // Standardport
+  ArduinoOTA.setRebootOnSuccess(true); // Gerät nach erfolgreichem Update neu starten
   ArduinoOTA.begin();
-  Serial.println("OTA bereit");
-
+  Serial.println("OTA Server gestartet und bereit");
 }
