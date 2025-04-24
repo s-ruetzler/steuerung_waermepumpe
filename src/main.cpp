@@ -488,9 +488,9 @@ void handlePayloadPumpe(byte* payload, unsigned int length){
   timeOutPumpe = millis() - lastTimePumpe;
   lastTimePumpe = millis();
 
-
-  powerPumpe = datenPumpe["StatusSNS"]["ENERGY"]["Power"];
-  // Serial.println(value);
+  // Serial.println("Payload Pumpe: " + String((char*)payload));
+  powerPumpe = datenPumpe["ENERGY"]["Power"];
+  // Serial.println(powerPumpe);
 
   
 }
