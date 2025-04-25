@@ -1,4 +1,5 @@
-// const { stat } = require("fs");
+'use strict';
+
 
 //Mqtt Daten
 var mqttBroker;
@@ -12,6 +13,8 @@ var intervalPumpe;
 var mqttTopicSteuerung;
 var intervalSeuerung;
 var mqttTopicZustand;
+var mqttTopicErrorMessage;
+var mqttTopicPinStates;
 
 //Wlan Daten
 var ssid;
@@ -82,6 +85,8 @@ function datenLaden() {
     mqttTopicPumpe = document.getElementById("mqttTopicPumpe");
     mqttTopicSteuerung = document.getElementById("mqttTopicSteuerung");
     mqttTopicZustand = document.getElementById("mqttTopicZustand");
+    mqttTopicErrorMessage = document.getElementById("mqttTopicErrorMessage");
+    mqttTopicPinStates = document.getElementById("mqttTopicPinStates");
 
     intervalPumpe = document.getElementById("intervalPumpe");
     intervalSeuerung = document.getElementById("intervalSteuerung");
@@ -112,8 +117,10 @@ function datenLaden() {
             mqttTopicPumpe.setAttribute("value", response["mqttTopicPumpe"]);
             intervalPumpe.setAttribute("value", response["intervalPumpe"]);
             mqttTopicSteuerung.setAttribute("value", response["mqttTopicSteuerung"]);
-            intervalSeuerung.setAttribute("value", response["intervalSeuerung"]);
+            intervalSeuerung.setAttribute("value", response["intervalSteuerung"]);
             mqttTopicZustand.setAttribute("value", response["mqttTopicZustand"]);
+            mqttTopicErrorMessage.setAttribute("value", response["mqttTopicErrorMessage"]);
+            mqttTopicPinStates.setAttribute("value", response["mqttTopicPinStates"]);
             updateErrorMessage(response["errorMessage"]);
             updatePinStatus(response["outputPinStatus"], response["inputPinStatus"]);
             ipAddress.setAttribute("value", response["ipAddress"]);

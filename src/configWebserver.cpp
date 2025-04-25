@@ -3,9 +3,25 @@
 
 void ConfigWebserver::SERVER(){
     pServer->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
-        // Serial.println("Seite aufgerufen");
+        if (!request->authenticate(this->username.c_str(), this->password.c_str())) {
+            return request->requestAuthentication();
+        }
+
+        if (!LittleFS.exists("/index.html")) {
+            Serial.println("Error: /index.html not found on LittleFS");
+            request->send(500, "text/plain", "Internal Server Error: /index.html not found");
+            return;
+        }
+
+        // // Debugging: Check free heap memory
+        // Serial.print("Free heap before sending /index.html: ");
+        // Serial.println(ESP.getFreeHeap());
+
         request->send(LittleFS, "/index.html", String(), false);
+
+        // // Debugging: Check free heap memory after sending
+        // Serial.print("Free heap after sending /index.html: ");
+        // Serial.println(ESP.getFreeHeap());
     });
 
     pServer->on("/style.css", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -19,13 +35,13 @@ void ConfigWebserver::SERVER(){
     });
 
     pServer->on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(LittleFS, "/favicon.ico", "text/plain");
+        request->send(LittleFS, "/favicon.svg", "text/plain");
     });
     
     pServer->on("/daten", HTTP_GET, [this](AsyncWebServerRequest *request) {
         if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
-        // loadConfig();
-        JsonDocument datenSenden;
+        
+        DynamicJsonDocument datenSenden(1024); // Corrected to DynamicJsonDocument
         datenSenden["mqttBroker"] = config["mqttBroker"];
         datenSenden["mqttPort"] = config["mqttPort"];
         datenSenden["mqttTopicPumpe"] = config["mqttTopicPumpe"];
@@ -33,6 +49,8 @@ void ConfigWebserver::SERVER(){
         datenSenden["mqttTopicSteuerung"] = config["mqttTopicSteuerung"];
         datenSenden["intervalSteuerung"] = config["intervalSteuerung"];
         datenSenden["mqttTopicZustand"] = config["mqttTopicZustand"];
+        datenSenden["mqttTopicErrorMessage"] = config["mqttTopicErrorMessage"];
+        datenSenden["mqttTopicPinStates"] = config["mqttTopicPinStates"];
         datenSenden["errorMessage"] = errorMessage;
         datenSenden["outputPinStatus"] = outputPinStatus;
         datenSenden["inputPinStatus"] = inputPinStatus;
@@ -44,6 +62,9 @@ void ConfigWebserver::SERVER(){
 
         String json = "";
         serializeJson(datenSenden, json);
+        // // Debugging: Check free heap memory
+        // Serial.print("Free heap before sending /daten: ");
+        // Serial.println(ESP.getFreeHeap());
         request->send(200, "application/json", json);
     });
 
@@ -59,7 +80,7 @@ void ConfigWebserver::SERVER(){
         if (!request->authenticate(this->username.c_str(), this->password.c_str())) return request->requestAuthentication();
         
         if(request->url()=="/neueDaten" && request->method() == HTTP_POST){
-    
+            request->send(200, "text/plain", "Daten empfangen");
             buffer += String((char*)data);
 
             if(index + len == total) {
@@ -68,28 +89,22 @@ void ConfigWebserver::SERVER(){
                 Serial.print("Länge: ");
                 Serial.println(len);
 
-                // Serial.println(buffer);
+                DeserializationError error = deserializeJson(neueDaten, buffer);
+                if (error) {
+                    Serial.print("Deserialization failed: ");
+                    Serial.println(error.c_str());
+                    request->send(400, "text/plain", "Invalid JSON");
+                    buffer = ""; // Clear the buffer
+                    return;
+                }
 
-                deserializeJson(neueDaten, buffer);
                 Serial.println(neueDaten.as<String>());
                 neueDatenVerarbeiten(neueDaten);
-                request->send(200, "text/plain", "Daten empfangen");
+                
 
-                // Clear the buffer
-                buffer = "";
-                }
-        
+                buffer = ""; // Clear the buffer
+            }
         }
-
-
-            // if(request->url()=="/neueDaten" && request->method() == HTTP_POST){
-            //     // Serial.println("Daten empfangen");
-            //     // Serial.println((char*)data);
-            //     deserializeJson(neueDaten, (char*)data);
-            //     // Serial.println(neueDaten.as<String>());
-            //     neueDatenVerarbeiten(neueDaten);
-            //     request->send(200, "text/plain", "Daten empfangen");
-            // }
     });
 
     pServer->onNotFound([this](AsyncWebServerRequest *request) {
@@ -101,9 +116,7 @@ void ConfigWebserver::SERVER(){
 }
 
 
-void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
-    // Serial.println(daten.as<String>());
-
+void ConfigWebserver::neueDatenVerarbeiten(DynamicJsonDocument daten){
     if (daten.containsKey("benutzername")) {
         File secretFile = dateisystem->open("/json/secret.json", "w");
         if (!secretFile) {
@@ -125,7 +138,6 @@ void ConfigWebserver::neueDatenVerarbeiten(JsonDocument daten){
         const char* key = kv.key().c_str();
         Serial.println(key);
         config[key] = daten[key];
-        
     }
 
     saveConfig();
@@ -138,19 +150,21 @@ void ConfigWebserver::loadConfig(){
         Serial.println("Failed to open config file for reading");
         config["mqttBroker"] = "sruetzler.de";
         config["mqttPort"] = 8883;
-        config["mqttBenutzername"] = "";
+        config["mqttBenutzername"] = "waermepumpe";
         config["mqttPasswort"] = "";
-        config["mqttTopicPumpe"] = "stat/tasmota_test/STATUS8";
+        config["mqttTopicPumpe"] = "tele/tasmota_test/SENSOR";
         config["intervalPumpe"] = 20000;
-        config["mqttTopicSteuerung"] = "waermepumpe/enable";
+        config["mqttTopicSteuerung"] = "waermepumpeTest/enable";
         config["intervalSteuerung"] = 40000;
-        config["mqttTopicZustand"] = "waermepumpe/state";
+        config["mqttTopicZustand"] = "waermepumpeTest/state";
         config["ssid"] = "";
         config["passwortWlan"] = "";
         config["ipConfig"] = "dhcp";
         config["ipAddress"] = "";
         config["subnetMask"] = "255.255.255.0";
         config["gateway"] = "192.168.178.1";
+        config["mqttTopicErrorMessage"] = "waermepumpeTest/error";
+        config["mqttTopicPinStates"] = "waermepumpeTest/pinStates";
         saveConfig();
 
         return;

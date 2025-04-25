@@ -8,40 +8,34 @@
 
 class ConfigWebserver {
     public:
-        JsonDocument config;
+        DynamicJsonDocument config{1024};
         String errorMessage;
         int outputPinStatus = 0;
         int inputPinStatus = 0;
 
-        ConfigWebserver(fs::FS* fs, String websitePasswort, String websiteUsername) : dateisystem(fs){
+        ConfigWebserver(fs::FS* fs, String websitePasswort, String websiteUsername) : dateisystem(fs), neueDaten(1024) {
             this->username = websiteUsername;
             this->password = websitePasswort;
             pServer = new AsyncWebServer(80);
             loadConfig();
             SERVER();
-
-
         };
-        
 
         ~ConfigWebserver(){
-            delete pServer;
+            if (pServer) {
+                delete pServer;
+            }
         };
 
-
     private:
-        JsonDocument neueDaten;
-        // JsonDocument config;
-        // String zustandString;
-        // JsonDocument details;
+        DynamicJsonDocument neueDaten;
         AsyncWebServer *pServer;
         fs::FS* dateisystem;
         String username;
         String password; 
         String buffer = "";
         void SERVER();
-        void neueDatenVerarbeiten(JsonDocument neueDaten);
+        void neueDatenVerarbeiten(DynamicJsonDocument neueDaten);
         void loadConfig();
         void saveConfig();
-
 };

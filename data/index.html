@@ -6,8 +6,6 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>Wärmepumpe Pool</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="style.css"/>
-        <script src="script.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     </head>
     <body>
@@ -63,6 +61,12 @@
                 
                 <label for="mqttTopicZustand">Topic Aktueller Zustand:</label>
                 <input type="text" id="mqttTopicZustand" name="mqttTopicZustand"><br>
+                
+                <label for="mqttTopicErrorMessage">Topic Fehlermeldungen:</label>
+                <input type="text" id="mqttTopicErrorMessage" name="mqttTopicErrorMessage"><br>
+
+                <label for="mqttTopicPinStates">Topic Pin-Zustände:</label>
+                <input type="text" id="mqttTopicPinStates" name="mqttTopicPinStates"><br>
                 
                 <button type="button" onclick="datenSenden('form-mqtt')">Speichern</button>
             </form>
@@ -127,5 +131,7 @@
         
         <div id="notification" class="notification">Daten wurden erfolgreich gespeichert.</div>
         <button id="restart-button" class="restart-button" onclick="confirmRestart()">Neustarten</button>
+        <link rel="stylesheet" href="style.css"/>
+        <script src="script.js"></script>
     </body>
 </html>

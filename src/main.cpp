@@ -6,6 +6,7 @@
 #include <ESPAsyncTCP.h>
 #include <configWebserver.h>
 #include <ArduinoOTA.h>
+#include <WiFiUdp.h>
 #include <PubSubClient.h>
 #include <ESP8266mDNS.h>
 
@@ -16,6 +17,8 @@ int mqtt_port;
 String mqttTopicPumpe;
 String mqttTopicSteuerung;
 String mqttTopicZustand;
+String mqttTopicErrorMessage;
+String mqttTopicPinStates;
 
 unsigned long lastTimeMQTT= 0;
 unsigned long lastTimePumpe = 0;
@@ -92,6 +95,7 @@ void setup() {
 
   configServer = new ConfigWebserver(&LittleFS, passwordWebsite, usernameWebsite);
   configServer->errorMessage = "Keine Fehlermeldung vorhanden";
+  // client.publish(mqttTopicErrorMessage.c_str(), "No Message", true);
 
   setup_wifi_mqtt();
 
@@ -101,8 +105,7 @@ void setup() {
 void loop() {
   wlanConnected = WiFi.status() == WL_CONNECTED;
   zustandKompressorPin = digitalRead(INPUT_PIN);
-  configServer->inputPinStatus = zustandKompressorPin;
-  configServer->outputPinStatus = digitalRead(OUTPUT_PIN);
+
 
   if (configMode){
     if (!wlanOpen){
@@ -186,6 +189,8 @@ void setup_wifi_mqtt(){
   String tmpTP = configServer->config["mqttTopicPumpe"];
   String tmpTS = configServer->config["mqttTopicSteuerung"];
   String tmpTZ = configServer->config["mqttTopicZustand"];
+  String tmpTEM = configServer->config["mqttTopicErrorMessage"];
+  String tmpTPS = configServer->config["mqttTopicPinStates"];
   int tmpIP = configServer->config["intervalPumpe"];
   int tmpIS = configServer->config["intervalSteuerung"];
 
@@ -203,6 +208,8 @@ void setup_wifi_mqtt(){
   mqttTopicPumpe = tmpTP;
   mqttTopicSteuerung = tmpTS;
   mqttTopicZustand = tmpTZ;
+  mqttTopicErrorMessage = tmpTEM;
+  mqttTopicPinStates = tmpTPS;
   intervalPumpe = tmpIP;
   intervalSteuerung = tmpIS;
 
@@ -262,6 +269,7 @@ void changeZustand(String newState){
   if (zustand == "Error" && newState != "Error")
   {
     configServer->errorMessage = "Keine Fehlermeldung vorhanden";
+    client.publish(mqttTopicErrorMessage.c_str(), "No Message", true);
   }
 
   zustand = newState;
@@ -291,6 +299,11 @@ void changeZustand(String newState){
     zustandNR = 4;
     digitalWrite(OUTPUT_PIN, LOW);
   }
+
+  configServer->inputPinStatus = zustandKompressorPin;
+  configServer->outputPinStatus = digitalRead(OUTPUT_PIN);
+  String pinStates = "{\"inputPin\":" + String(zustandKompressorPin) + ",\"outputPin\":" + String(digitalRead(OUTPUT_PIN)) + "}";
+  client.publish(mqttTopicPinStates.c_str(), pinStates.c_str(), true);
 
   Serial.println("Zustand: " + zustand);
   client.publish(mqttTopicZustand.c_str(), zustand.c_str(), true);
@@ -396,6 +409,7 @@ bool fehlerVorhanden(){
       changeZustand("Error");
       Serial.println("Error: Keine Verbindung zum MQTT Broker oder zum WLAN");
       configServer->errorMessage = "Es konnte keine Verbindung zum MQTT Broker oder zum WLAN hergestellt werden";
+      client.publish(mqttTopicErrorMessage.c_str(), "Keine WLAN/MQTT Verbindung", true);
 
     }
     return true;
@@ -408,6 +422,7 @@ bool fehlerVorhanden(){
       changeZustand("Error");
       Serial.println("Error: Pumpe sendet keine Daten");
       configServer->errorMessage = "Die Poolpumpe sendet keine Daten";
+      client.publish(mqttTopicErrorMessage.c_str(), "Keine Daten von Poolpumpe", true);
 
     }
     return true;
@@ -420,6 +435,7 @@ bool fehlerVorhanden(){
       changeZustand("Error");
       Serial.println("Error: Steuerung sendet keine Daten");
       configServer->errorMessage = "Die Steuerung sendet keine Daten";
+      client.publish(mqttTopicErrorMessage.c_str(), "Keine Daten von Steuerung", true);
 
     }
     return true;
@@ -448,7 +464,7 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
 
 void reconnect_mqtt() {
   client.setServer(mqtt_server.c_str(), mqtt_port);
-  client.setBufferSize(2048);
+  // client.setBufferSize(2048);
   client.setCallback(callback_mqtt);
 
   // Loop until we're reconnected
@@ -464,6 +480,7 @@ void reconnect_mqtt() {
     client.subscribe(mqttTopicPumpe.c_str());
     client.subscribe(mqttTopicSteuerung.c_str());
     configServer->errorMessage = "Keine Fehlermeldung vorhanden";
+    client.publish(mqttTopicErrorMessage.c_str(), "No Message", true);
     changeZustand("Off");
     if (MDNS.begin(dns_name)) {
       Serial.println("DNS gestartet, erreichbar unter: ");
