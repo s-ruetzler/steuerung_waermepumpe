@@ -28,9 +28,9 @@ class ConfigWebserver {
         };
 
     private:
+        fs::FS* dateisystem;
         DynamicJsonDocument neueDaten;
         AsyncWebServer *pServer;
-        fs::FS* dateisystem;
         String username;
         String password; 
         String buffer = "";

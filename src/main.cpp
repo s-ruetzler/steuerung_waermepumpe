@@ -464,7 +464,7 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
 
 void reconnect_mqtt() {
   client.setServer(mqtt_server.c_str(), mqtt_port);
-  // client.setBufferSize(2048);
+  client.setBufferSize(512);
   client.setCallback(callback_mqtt);
 
   // Loop until we're reconnected
