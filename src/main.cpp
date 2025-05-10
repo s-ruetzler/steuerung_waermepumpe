@@ -20,13 +20,13 @@ String mqttTopicZustand;
 String mqttTopicErrorMessage;
 String mqttTopicPinStates;
 
-unsigned long lastTimeMQTT= 0;
-unsigned long lastTimePumpe = 0;
-unsigned int timeOutPumpe = 0;
-unsigned long lastTimeSteuerung = 0;
-unsigned long lastTimeChangeZustand = 0;
-unsigned int timeOutSteuerung = 0;
-unsigned int timerDelay = 3000;
+unsigned long lastTimeMQTT= 0; //Wann wurde das letzte Mal versucht, eine Verbindung zum MQTT Broker herzustellen
+unsigned long lastTimePumpe = 0; //Wann die Poolpumpe das letzte Mal Daten gesendet hat
+unsigned int timeOutPumpe = 0; //Wie lange hat es beim letzten Mal gedauert, bis die Pumpe erneut daten gesendet hat
+unsigned long lastTimeSteuerung = 0; //Wann die Steuerung das letzte Mal Daten gesendet hat
+unsigned int timeOutSteuerung = 0; //Wie lange hat es beim letzten Mal gedauert, bis die Steuerung erneut daten gesendet hat
+unsigned long lastTimeChangeZustand = 0; //Wann wurde der Zustand das letzte Mal geändert
+unsigned long timerNeustarten = 0; //Wann wurde der Neustart das letzte Mal gestartet
 bool configMode = false;
 bool wlanOpen = false;
 bool wlanConnected = false;
@@ -36,11 +36,17 @@ bool setupOTAaufgerufen = false;
 JsonDocument datenPumpe;
 int powerPumpe = 0;
 
-const int OUTPUT_PIN = D6;
-const int INPUT_PIN = D5;
+const int OUTPUT_PIN = D6; //Pin für Wärmepumpe einschalten
+const int INPUT_PIN = D5; //Rückmeldung, ob Kompressor läuft
+const int NEUSTART_PIN = D0; //Pin für Neustart der Steuerung (Wenn HIGH, dann Platine ohne Spannung)
+
 int zustandKompressorPin = LOW;
 int zustandKompressorPinAlt = LOW;
+int zustandKompressorPinAlt2 = LOW;
+int zustandOutputPinAlt2 = LOW;
+
 bool heatingEnabled = false;
+bool neugestartet = false;
 const int prellzeit = 50;
 unsigned long lastMillisPrell = 0;
 int intervalPumpe = 20000; //Wie oft, wird von der Poolpumpe neue Daten erwartet
@@ -65,6 +71,13 @@ ConfigWebserver *configServer = nullptr;
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
+
+
+//Debug Things
+unsigned int d_count_change_pin = 0;
+unsigned int d_count_change_ping_alt = 99;
+
+
 // AsyncWebServer server(80);
 
 void openWLAN(); //Das eigene WLAN wird erstellt
@@ -79,11 +92,13 @@ void handlePayloadSteuerung(byte* payload, unsigned int length); //Payload von S
 void setupOTA(); // OTA einstellungen einrichten
 void logikChangeZustand(); //Logik des Programms
 bool fehlerVorhanden(); //Fehler überprüfen
+void handlePinMessages(); //Pin Nachrichten verarbeiten
 
 void setup() {
   Serial.begin(115200);
   pinMode(OUTPUT_PIN, OUTPUT);
   pinMode(INPUT_PIN, INPUT);
+  pinMode(NEUSTART_PIN, OUTPUT);
   delay(2000);
 
   if(!LittleFS.begin()){
@@ -133,7 +148,7 @@ void loop() {
 
   //WLAN Verbindung hergestellt, aber noch keine Verbindung zum MQTT Broker
   if (!client.connected() && wlanConnected) {
-    if (millis() - lastTimeMQTT> timerDelay)
+    if (millis() - lastTimeMQTT > 3000)
     {
       Serial.println("Neu verbinden...");
       reconnect_mqtt();
@@ -147,6 +162,27 @@ void loop() {
     lastMillisPrell = millis();
   }
 
+  //Wenn der Zustand des Kompressors auf Off ist, dann wird nach 40 Sekunden die Steuerung der Wärempumpe neugestartet.
+  //Das ist ein Workaround, da sonst der Lüfter der Wärmepumpe immer weiterläuft, da die Pumpe nicht die richtige Temperatur auslesen kann.
+  if (millis() - lastTimeChangeZustand > 40000 && zustand == "Off" && !neugestartet){
+    digitalWrite(NEUSTART_PIN, HIGH);
+    neugestartet = true;
+    timerNeustarten = millis();
+  }
+
+  //Wenn Steuerung der Wärmepumpe länger als 5 Sekunden ausgeschaltet ist, dann wird die Steuerung wieder eingeschaltet.
+  if (digitalRead(NEUSTART_PIN) == HIGH && millis() - timerNeustarten > 5000){
+    digitalWrite(NEUSTART_PIN, LOW);
+  }
+
+  //Debug things
+  if (d_count_change_pin != d_count_change_ping_alt){
+    d_count_change_ping_alt = d_count_change_pin;
+    client.publish("heatPump/debug", String(d_count_change_pin).c_str());
+  }
+
+
+  handlePinMessages();
   logikChangeZustand();
   client.loop();
   ArduinoOTA.handle();
@@ -278,32 +314,35 @@ void changeZustand(String newState){
     zustandNR = 0;
     heatingEnabled = false;
     digitalWrite(OUTPUT_PIN, LOW);
+    neugestartet = false;
+    d_count_change_pin++;
 
   } else if (zustand == "On"){
     zustandNR = 1;
     heatingEnabled = true;
     lastTimePumpe = millis();
     digitalWrite(OUTPUT_PIN, HIGH);
+    d_count_change_pin++;
 
   } else if (zustand == "Wait_Kompressor"){
     zustandNR = 2;
     heatingEnabled = true;
     digitalWrite(OUTPUT_PIN, HIGH);
+    d_count_change_pin++;
 
   } else if (zustand == "Error"){
     zustandNR = 3;
     digitalWrite(OUTPUT_PIN, LOW);
+    d_count_change_pin++;
 
   }
   else if (zustand == "Wait_Pumpe"){
     zustandNR = 4;
     digitalWrite(OUTPUT_PIN, LOW);
+    d_count_change_pin++;
   }
 
-  configServer->inputPinStatus = zustandKompressorPin;
-  configServer->outputPinStatus = digitalRead(OUTPUT_PIN);
-  String pinStates = "{\"inputPin\":" + String(zustandKompressorPin) + ",\"outputPin\":" + String(digitalRead(OUTPUT_PIN)) + "}";
-  client.publish(mqttTopicPinStates.c_str(), pinStates.c_str(), true);
+
 
   Serial.println("Zustand: " + zustand);
   client.publish(mqttTopicZustand.c_str(), zustand.c_str(), true);
@@ -543,6 +582,23 @@ void handlePayloadSteuerung(byte* payload, unsigned int length){
   
   // Serial.println(payloadString);
 
+}
+
+
+void handlePinMessages(){
+  if (zustandKompressorPin != zustandKompressorPinAlt2 || digitalRead(OUTPUT_PIN) != zustandOutputPinAlt2){
+    if(zustandKompressorPin != zustandKompressorPinAlt2){ //Gucken, ob Pin noch Prellt.
+      if (millis() - lastMillisPrell < prellzeit){
+        return;
+      }
+    }
+    zustandKompressorPinAlt2 = zustandKompressorPin;
+    zustandOutputPinAlt2 = digitalRead(OUTPUT_PIN);
+    configServer->inputPinStatus = zustandKompressorPin;
+    configServer->outputPinStatus = digitalRead(OUTPUT_PIN);
+    String pinStates = "{\"inputPin\":" + String(zustandKompressorPin) + ",\"outputPin\":" + String(digitalRead(OUTPUT_PIN)) + "}";
+    client.publish(mqttTopicPinStates.c_str(), pinStates.c_str(), true);
+  }
 }
 
 
